@@ -46,9 +46,9 @@ async def on_ready():
             title="Server Verification",
             description="Welcome! Click the **Verify** button below to get access to the server.\n\n"
                        "You'll receive a verification link to complete a CAPTCHA.",
-            color=discord.Color.light_embed()
+            color=discord.Color.blurple()
         )
-        embed.set_footer(text="If you have issues, message an officer.")
+        embed.set_footer(text="If you experience any issues, message an officer.")
 
         await channel.send(embed=embed, view=VerifyView())
         print("✅ Posted verify message with button!")
