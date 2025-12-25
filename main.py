@@ -39,16 +39,16 @@ def get_roles(guild: discord.Guild):
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
-    # Post the verify message with button in the verify channel
+    # make the bot post the verify message with button in the verify channel
     channel = bot.get_channel(VERIFY_CHANNEL_ID)
     if channel:
         embed = discord.Embed(
-            title="🔐 Server Verification",
+            title="Server Verification",
             description="Welcome! Click the **Verify** button below to get access to the server.\n\n"
-                       "You'll receive a verification link in your DMs.",
-            color=discord.Color.blue()
+                       "You'll receive a verification link to complete a CAPTCHA.",
+            color=discord.Color.light_embed()
         )
-        embed.set_footer(text="If you have issues, message a moderator.")
+        embed.set_footer(text="If you have issues, message an officer.")
 
         await channel.send(embed=embed, view=VerifyView())
         print("✅ Posted verify message with button!")
@@ -61,7 +61,7 @@ async def on_member_join(member: discord.Member):
     unverified, _ = get_roles(member.guild)
     if unverified:
         try:
-            await member.add_roles(unverified, reason="New member gate")
+            await member.add_roles(unverified, reason="New member joined the server")
         except discord.Forbidden:
             print("Missing permissions to add Unverified role")
 
@@ -69,7 +69,7 @@ class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, custom_id="embs_verify_button")
+    @discord.ui.button(label="Verify", style=discord.ButtonStyle.blurple, custom_id="embs_verify_button")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Create a verification token row in Supabase and DM/reply a URL."""
         guild = interaction.guild
