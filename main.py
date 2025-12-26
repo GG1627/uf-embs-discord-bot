@@ -5,7 +5,12 @@ from dotenv import load_dotenv
 import os
 import secrets
 import datetime
+import re
+import asyncio
 from supabase import create_client, Client
+from better_profanity import profanity
+from words.BANNED_WORDS import bad_words
+from words.ALLOWED_WORDS import chill_profane_words
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -20,6 +25,52 @@ intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+profanity.load_censor_words()  # load default list
+
+# ______________________PROFANITY FILTER FUNCTIONS______________________
+def contains_allowed_words(text: str) -> bool:
+    """Check if message contains any allowed profane words."""
+    text_lower = text.lower()
+    # Check each allowed word (with word boundaries to avoid false positives)
+    for word in chill_profane_words:
+        # Use word boundaries to match whole words only
+        pattern = r'\b' + re.escape(word.lower()) + r'\b'
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
+def contains_banned_words(text: str) -> bool:
+    """Check if message contains any banned slurs/hate speech."""
+    text_lower = text.lower()
+    # Check each banned word (with word boundaries)
+    for word in bad_words:
+        # Use word boundaries to match whole words only
+        pattern = r'\b' + re.escape(word.lower()) + r'\b'
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
+def check_profanity(text: str) -> tuple[bool, str]:
+    """
+    Check if message contains profanity.
+    Returns: (is_banned, reason)
+    - If contains allowed words, return (False, "allowed")
+    - If contains banned words or better_profanity detects profanity, return (True, reason)
+    """
+    # First check: if message contains allowed words, it's fine
+    if contains_allowed_words(text):
+        return False, "allowed"
+    
+    # Second check: if message contains banned words from our list
+    if contains_banned_words(text):
+        return True, "banned_word"
+    
+    # Third check: use better_profanity to detect profanity
+    if profanity.contains_profanity(text):
+        return True, "profanity_detected"
+    
+    return False, "clean"
 
 # ______________________CONFIG______________________
 UNVERIFIED_ROLE_NAME = "Unverified"
@@ -64,6 +115,59 @@ async def on_member_join(member: discord.Member):
             await member.add_roles(unverified, reason="New member joined the server")
         except discord.Forbidden:
             print("Missing permissions to add Unverified role")
+
+# censor out any slurs/hate speech in messages
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+    
+    # Check for profanity
+    is_banned, reason = check_profanity(message.content)
+    
+    if is_banned:
+        try:
+            # Delete the message
+            await message.delete()
+            
+            # Send a warning message
+            warning_embed = discord.Embed(
+                title="⚠️ Message Removed",
+                description=f"{message.author.mention}, please refrain from using inappropriate language in this server.",
+                color=discord.Color.red()
+            )
+            warning_embed.set_footer(text="This message was automatically removed by the moderation system.")
+            
+            # Try to send warning in the same channel, fallback to DM if no permissions
+            try:
+                warning_msg = await message.channel.send(embed=warning_embed)
+                # Delete warning after 10 seconds
+                async def delete_warning():
+                    await asyncio.sleep(10.0)
+                    try:
+                        await warning_msg.delete()
+                    except (discord.NotFound, discord.Forbidden):
+                        pass
+                asyncio.create_task(delete_warning())
+            except discord.Forbidden:
+                # If we can't send in channel, try DM
+                try:
+                    await message.author.send(embed=warning_embed)
+                except discord.Forbidden:
+                    # User has DMs disabled, just log it
+                    print(f"Could not send warning to {message.author} - message deleted for: {reason}")
+        except discord.Forbidden:
+            print(f"Missing permissions to delete message from {message.author} in {message.channel}")
+        except discord.NotFound:
+            # Message was already deleted
+            pass
+        except Exception as e:
+            print(f"Error handling profanity filter: {e}")
+    
+    # Process bot commands after checking profanity
+    await bot.process_commands(message)
+
+
 
 class VerifyView(discord.ui.View):
     def __init__(self):
