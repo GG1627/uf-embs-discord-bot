@@ -8,7 +8,6 @@ import datetime
 import re
 import asyncio
 from supabase import create_client, Client
-from better_profanity import profanity
 from words.BANNED_WORDS import bad_words
 from words.ALLOWED_WORDS import chill_profane_words
 
@@ -26,8 +25,6 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-profanity.load_censor_words()  # load default list
-
 # ______________________PROFANITY FILTER FUNCTIONS______________________
 def contains_allowed_words(text: str) -> bool:
     """Check if message contains any allowed profane words."""
@@ -41,14 +38,30 @@ def contains_allowed_words(text: str) -> bool:
     return False
 
 def contains_banned_words(text: str) -> bool:
-    """Check if message contains any banned slurs/hate speech."""
+    """
+    Check if message contains any banned slurs/hate speech.
+    Allows longer words that contain banned words (e.g., "class" containing "ass").
+    """
     text_lower = text.lower()
-    # Check each banned word (with word boundaries)
-    for word in bad_words:
-        # Use word boundaries to match whole words only
-        pattern = r'\b' + re.escape(word.lower()) + r'\b'
-        if re.search(pattern, text_lower):
-            return True
+    
+    for banned_word in bad_words:
+        banned_word_lower = banned_word.lower()
+        
+        # Find all occurrences of the banned word
+        for match in re.finditer(re.escape(banned_word_lower), text_lower):
+            start_pos = match.start()
+            end_pos = match.end()
+            
+            # Check if it's at a word boundary (standalone word)
+            # Word boundary means: start of string OR non-alphanumeric before, AND end of string OR non-alphanumeric after
+            is_word_start = (start_pos == 0 or not text_lower[start_pos - 1].isalnum())
+            is_word_end = (end_pos == len(text_lower) or not text_lower[end_pos].isalnum())
+            
+            # Only ban if it's a standalone word (at word boundaries)
+            # If it's part of a longer word (has alphanumeric chars before/after), allow it
+            if is_word_start and is_word_end:
+                return True
+    
     return False
 
 def check_profanity(text: str) -> tuple[bool, str]:
@@ -56,7 +69,7 @@ def check_profanity(text: str) -> tuple[bool, str]:
     Check if message contains profanity.
     Returns: (is_banned, reason)
     - If contains allowed words, return (False, "allowed")
-    - If contains banned words or better_profanity detects profanity, return (True, reason)
+    - If contains banned words, return (True, "banned_word")
     """
     # First check: if message contains allowed words, it's fine
     if contains_allowed_words(text):
@@ -65,10 +78,6 @@ def check_profanity(text: str) -> tuple[bool, str]:
     # Second check: if message contains banned words from our list
     if contains_banned_words(text):
         return True, "banned_word"
-    
-    # Third check: use better_profanity to detect profanity
-    if profanity.contains_profanity(text):
-        return True, "profanity_detected"
     
     return False, "clean"
 
@@ -166,8 +175,6 @@ async def on_message(message: discord.Message):
     
     # Process bot commands after checking profanity
     await bot.process_commands(message)
-
-
 
 class VerifyView(discord.ui.View):
     def __init__(self):
