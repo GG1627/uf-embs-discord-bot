@@ -18,10 +18,11 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Custom word blacklist (configurable)
   - Auto-delete messages with banned words
   - Warn users on violations
+  - ^^^ DONE
 
   - Detect a spam message from a bot and delete it
-  - Maybe something like if said message contains at least 10 of the most command spam words, delete it 🤔
-  @Lincy u can work on this if u want,
+  - Maybe something like if said message contains at least 3/4 of the most command spam words, delete it 🤔
+  - @Lincy u can work on this if u want, i didnt start this
 
 ---
 
