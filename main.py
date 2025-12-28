@@ -10,14 +10,19 @@ import asyncio
 from supabase import create_client, Client
 from words.BANNED_WORDS import bad_words
 from words.ALLOWED_WORDS import chill_profane_words
+from words.SPAM_WORDS import spam_words
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 
-# init the supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+# init the supabase client (only if credentials are provided)
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+else:
+    print("⚠️ Warning: Supabase credentials not found. Verification feature will be disabled.")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -81,6 +86,32 @@ def check_profanity(text: str) -> tuple[bool, str]:
     
     return False, "clean"
 
+# ______________________SPAM DETECTION FUNCTIONS______________________
+def check_spam(text: str) -> bool:
+    """
+    Check if message contains at least 2/3 of the spam words.
+    Returns True if message is spam, False otherwise.
+    """
+    if not text:
+        return False
+    
+    text_lower = text.lower()
+    matched_words = 0
+    total_spam_words = len(spam_words)
+    
+    # Check how many spam words/phrases are present in the message
+    for spam_word in spam_words:
+        # Use case-insensitive search for phrases (some may be multi-word)
+        if spam_word.lower() in text_lower:
+            matched_words += 1
+    
+    # Check if message contains at least 2/3 of spam words
+    # Round up: (2 * total_spam_words + 2) // 3
+    # Example: 16 words → 11 needed, 9 words → 6 needed
+    threshold = (2 * total_spam_words + 2) // 3
+    
+    return matched_words >= threshold
+
 # ______________________CONFIG______________________
 UNVERIFIED_ROLE_NAME = "Unverified"
 MEMBER_ROLE_NAME = "Member"
@@ -111,9 +142,9 @@ async def on_ready():
         embed.set_footer(text="If you experience any issues, message an officer.")
 
         await channel.send(embed=embed, view=VerifyView())
-        print("✅ Posted verify message with button!")
+        print("Posted verify message with button!")
     else:
-        print(f"❌ Verify channel not found! Check VERIFY_CHANNEL_ID: {VERIFY_CHANNEL_ID}")
+        print(f"Verify channel not found! Check VERIFY_CHANNEL_ID: {VERIFY_CHANNEL_ID}")
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -125,13 +156,66 @@ async def on_member_join(member: discord.Member):
         except discord.Forbidden:
             print("Missing permissions to add Unverified role")
 
-# censor out any slurs/hate speech in messages
+# censor out any slurs/hate speech in messages and detect spam from all users
 @bot.event
 async def on_message(message: discord.Message):
-    if message.author.bot:
+    # Skip messages from the bot itself
+    if message.author == bot.user:
+        await bot.process_commands(message)
         return
     
-    # Check for profanity
+    # Check for spam messages from all users (bots and regular users)
+    if check_spam(message.content):
+        try:
+            # Delete the message
+            await message.delete()
+            user_type = "bot" if message.author.bot else "user"
+            print(f"Deleted spam message from {user_type} {message.author.name} (ID: {message.author.id})")
+            
+            # Send a warning message (only for regular users, not bots)
+            if not message.author.bot:
+                warning_embed = discord.Embed(
+                    title="⚠️ Spam Message Removed",
+                    description=f"{message.author.mention}, please refrain from posting spam messages in this server.",
+                    color=discord.Color.orange()
+                )
+                warning_embed.set_footer(text="This message was automatically removed by the spam filter.")
+                
+                # Try to send warning in the same channel, fallback to DM if no permissions
+                try:
+                    warning_msg = await message.channel.send(embed=warning_embed)
+                    # Delete warning after 10 seconds
+                    async def delete_warning():
+                        await asyncio.sleep(10.0)
+                        try:
+                            await warning_msg.delete()
+                        except (discord.NotFound, discord.Forbidden):
+                            pass
+                    asyncio.create_task(delete_warning())
+                except discord.Forbidden:
+                    # If we can't send in channel, try DM
+                    try:
+                        await message.author.send(embed=warning_embed)
+                    except discord.Forbidden:
+                        # User has DMs disabled, just log it
+                        print(f"Could not send spam warning to {message.author}")
+        except discord.Forbidden:
+            user_type = "bot" if message.author.bot else "user"
+            print(f"Missing permissions to delete spam message from {user_type} {message.author.name} in {message.channel}")
+        except discord.NotFound:
+            # Message was already deleted
+            pass
+        except Exception as e:
+            print(f"Error handling spam filter: {e}")
+        # Don't process commands if message was spam
+        return
+    
+    # Skip profanity check for bots (they've already been checked for spam above)
+    if message.author.bot:
+        await bot.process_commands(message)
+        return
+    
+    # Check for profanity (regular users only)
     is_banned, reason = check_profanity(message.content)
     
     if is_banned:
@@ -205,6 +289,13 @@ class VerifyView(discord.ui.View):
         expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=TOKEN_EXPIRY_MINUTES)
 
         # 2) insert into Supabase
+        if supabase is None:
+            await interaction.response.send_message(
+                "Verification is not available. Supabase is not configured.",
+                ephemeral=True,
+            )
+            return
+        
         try:
             supabase.table("discord_verification_tokens").insert({
                 "discord_user_id": str(user.id),
