@@ -2,7 +2,7 @@
 
 # File paths
 DATA_DIR = "data"
-SAVE_FILE = "data/role_message.json"
+MAJOR_YEAR_SELECT_SAVE_FILE = "data/major_year_select_message.json"
 VERIFY_SAVE_FILE = "data/verify_message.json"
 
 # Role names

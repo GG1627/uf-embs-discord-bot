@@ -5,8 +5,8 @@ import asyncio
 import discord
 from discord.ext import commands
 from bot.helpers import check_spam, check_profanity, get_roles
-from bot.views import MajorView, VerifyView
-from bot.config import SAVE_FILE, VERIFY_SAVE_FILE
+from bot.views import MajorView, VerifyView, YearView
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE
 
 
 def setup_events(bot: commands.Bot, supabase_client=None):
@@ -23,11 +23,12 @@ def setup_events(bot: commands.Bot, supabase_client=None):
             print("Persistent VerifyView loaded from saved message")
 
         # Check if roles are already set up, if not, remind admin
-        if not os.path.exists(SAVE_FILE):
+        if not os.path.exists(MAJOR_YEAR_SELECT_SAVE_FILE):
             print("⚠️ Roles not set up! Use !setuproles command to set it up.")
         else:
-            print("Persistent MajorView loaded from saved message")
+            print("Persistent YearView and MajorView loaded from saved message")
 
+        bot.add_view(YearView())
         bot.add_view(MajorView())
         bot.add_view(VerifyView(supabase_client))
         print("Persistent views added")

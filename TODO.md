@@ -10,29 +10,24 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Verify button in #verify channel
   - Supabase token storage
 
----
-## In Progress
-
-- [ ] **Message Filtering/Censoring**
+- [x] **Message Filtering/Censoring**
   - Filter foul language and profanity
   - Custom word blacklist (configurable)
   - Auto-delete messages with banned words
   - Warn users on violations
-  - ^^^ DONE
-
   - Detect a spam message from a bot and delete it
-  - Maybe something like if said message contains at least 3/4 of the most command spam words, delete it 🤔
-  - @Lincy u can work on this if u want, i didnt start this
+
+- [x] **Role Management System**
+  - **Majors**: Add roles for different majors (Computer Engineering, Electrical Engineering, etc.)
+  - **School Year**: Add roles for Freshman, Sophomore, Junior, Senior, Graduate
+  - Self-assignable role menu/buttons
+
+---
+## In Progress
 
 ---
 
 ## 📋 To Do
-
-- [ ] **Role Management System**
-  - **Majors**: Add roles for different majors (Computer Engineering, Electrical Engineering, etc.)
-  - **School Year**: Add roles for Freshman, Sophomore, Junior, Senior, Graduate
-  - Self-assignable role menu/buttons
-  - Slash commands for role assignment (`/role major`, `/role year`)
 
 - [ ] **Event Reminders**
   - Automatic reminders for scheduled events

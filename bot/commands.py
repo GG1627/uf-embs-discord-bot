@@ -4,8 +4,8 @@ import os
 import json
 import discord
 from discord.ext import commands
-from bot.views import MajorView, VerifyView
-from bot.config import SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID
+from bot.views import MajorView, VerifyView, YearView
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID
 
 
 def setup_commands(bot: commands.Bot):
@@ -15,24 +15,32 @@ def setup_commands(bot: commands.Bot):
     @commands.has_permissions(manage_guild=True)
     async def setuproles(ctx):
         # if we already have message saved dont create a new one
-        if os.path.exists(SAVE_FILE):
+        if os.path.exists(MAJOR_YEAR_SELECT_SAVE_FILE):
             return await ctx.send("Roles setup already exists.")
 
-        view = MajorView()
-        msg = await ctx.send(
+        major_view = MajorView()
+        year_view = YearView()
+        major_msg = await ctx.send(
             "Select your major from the menu below:",
-            view=view
+            view=major_view
         )
+        year_msg = await ctx.send(
+            "Select your year from the menu below:",
+            view=year_view
+        )
+
+
 
         # save the message + channel so we know it exists
         data = {
-            "message_id": msg.id,
+            "year_message_id": year_msg.id,
+            "major_message_id": major_msg.id,
             "channel_id": ctx.channel.id,
         }
-        with open(SAVE_FILE, "w") as f:
+        with open(MAJOR_YEAR_SELECT_SAVE_FILE, "w") as f:
             json.dump(data, f)
 
-        await ctx.send("Role selector created successfully 🎉")
+        await ctx.send("If your major is not listed, please message an officer.")
 
     @bot.command()
     @commands.has_permissions(manage_guild=True)
@@ -66,5 +74,6 @@ def setup_commands(bot: commands.Bot):
         with open(VERIFY_SAVE_FILE, "w") as f:
             json.dump(data, f)
 
-        await ctx.send("Verification button created successfully 🎉")
+        # commented out for testing
+        # await ctx.send("Verification button created successfully 🎉")
 
