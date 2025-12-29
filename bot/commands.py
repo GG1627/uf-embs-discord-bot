@@ -11,36 +11,38 @@ from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHA
 def setup_commands(bot: commands.Bot):
     """Register all bot commands."""
     
-    @bot.command()
-    @commands.has_permissions(manage_guild=True)
-    async def setuproles(ctx):
-        # if we already have message saved dont create a new one
-        if os.path.exists(MAJOR_YEAR_SELECT_SAVE_FILE):
-            return await ctx.send("Roles setup already exists.")
+    # not needed anymore because of discord onboarding
+    
+    # @bot.command()
+    # @commands.has_permissions(manage_guild=True)
+    # async def setuproles(ctx):
+    #     # if we already have message saved dont create a new one
+    #     if os.path.exists(MAJOR_YEAR_SELECT_SAVE_FILE):
+    #         return await ctx.send("Roles setup already exists.")
 
-        major_view = MajorView()
-        year_view = YearView()
-        major_msg = await ctx.send(
-            "Select your major from the menu below:",
-            view=major_view
-        )
-        year_msg = await ctx.send(
-            "Select your year from the menu below:",
-            view=year_view
-        )
+    #     major_view = MajorView()
+    #     year_view = YearView()
+    #     major_msg = await ctx.send(
+    #         "Select your major from the menu below:",
+    #         view=major_view
+    #     )
+    #     year_msg = await ctx.send(
+    #         "Select your year from the menu below:",
+    #         view=year_view
+    #     )
 
 
 
-        # save the message + channel so we know it exists
-        data = {
-            "year_message_id": year_msg.id,
-            "major_message_id": major_msg.id,
-            "channel_id": ctx.channel.id,
-        }
-        with open(MAJOR_YEAR_SELECT_SAVE_FILE, "w") as f:
-            json.dump(data, f)
+    #     # save the message + channel so we know it exists
+    #     data = {
+    #         "year_message_id": year_msg.id,
+    #         "major_message_id": major_msg.id,
+    #         "channel_id": ctx.channel.id,
+    #     }
+    #     with open(MAJOR_YEAR_SELECT_SAVE_FILE, "w") as f:
+    #         json.dump(data, f)
 
-        await ctx.send("If your major is not listed, please message an officer.")
+    #     await ctx.send("If your major is not listed, please message an officer.")
 
     @bot.command()
     @commands.has_permissions(manage_guild=True)

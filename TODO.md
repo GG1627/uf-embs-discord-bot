@@ -33,8 +33,6 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Automatic reminders for scheduled events
   - Support for recurring events (weekly meetings, etc.)
   - Configurable reminder times (1 day before, 1 hour before, etc.)
-  - Event creation command (`/event create`)
-  - Event listing command (`/event list`)
 
 - [ ] **Welcome Messages**
   - Custom welcome message when users join

@@ -122,7 +122,7 @@ class VerifyView(discord.ui.View):
 
         # optional: if already Member, do nothing
         _, member_role = get_roles(guild)
-        if member_role and member_role in user.roles:
+        if member_role == "Member":
             await interaction.response.send_message(
                 "You are already verified.", ephemeral=True
             )
