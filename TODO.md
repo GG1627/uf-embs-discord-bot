@@ -22,17 +22,17 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - **School Year**: Add roles for Freshman, Sophomore, Junior, Senior, Graduate
   - Self-assignable role menu/buttons
 
+- [x] **Event Reminders**
+  - Automatic reminders for scheduled events
+  - Support for recurring events (weekly meetings, etc.)
+  - Configurable reminder times (1 day before, 1 hour before, etc.)
+
 ---
 ## In Progress
 
 ---
 
 ## 📋 To Do
-
-- [ ] **Event Reminders**
-  - Automatic reminders for scheduled events
-  - Support for recurring events (weekly meetings, etc.)
-  - Configurable reminder times (1 day before, 1 hour before, etc.)
 
 - [ ] **Deploy Bot (Always Running)**
   - Deploy to hosting service (Heroku, Railway, DigitalOcean, etc.)
