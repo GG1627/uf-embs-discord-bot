@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from bot.helpers import check_spam, check_profanity, get_roles
 from bot.views import MajorView, VerifyView, YearView
-from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, ANNOUNCEMENTS_CHANNEL_ID, REMINDER_INTERVALS
 
 
 def setup_events(bot: commands.Bot, supabase_client=None):
@@ -32,6 +32,13 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         bot.add_view(MajorView())
         bot.add_view(VerifyView(supabase_client))
         print("Persistent views added")
+        
+        # Start the event reminder checker if Supabase is available
+        if supabase_client:
+            bot.loop.create_task(check_event_reminders(bot, supabase_client))
+            print("Event reminder system started")
+        else:
+            print("Event reminder system disabled - Supabase not available")
 
     @bot.event
     async def on_member_join(member: discord.Member):
@@ -146,4 +153,135 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         
         # Process bot commands after checking profanity
         await bot.process_commands(message)
+
+    async def check_event_reminders(bot, supabase):
+        """Check for events that need reminders and send them"""
+        if not supabase:
+            print("Warning: Supabase not available for event reminders")
+            return
+            
+        while True:
+            try:
+                from datetime import datetime, timedelta, timezone
+                current_time = datetime.now(timezone.utc)
+                
+                # Get upcoming events (next 30 days)
+                thirty_days_from_now = current_time + timedelta(days=30)
+                
+                response = supabase.table('events').select('*').gte('start_time', current_time.isoformat()).lte('start_time', thirty_days_from_now.isoformat()).execute()
+                events = response.data if response.data else []
+                
+                announcements_channel = bot.get_channel(ANNOUNCEMENTS_CHANNEL_ID)
+                
+                if not announcements_channel:
+                    print(f"Warning: Announcements channel {ANNOUNCEMENTS_CHANNEL_ID} not found")
+                    await asyncio.sleep(600)
+                    continue
+                
+                for event in events:
+                    # Parse event start time
+                    start_time_str = event['start_time'].replace('Z', '+00:00')
+                    event_datetime = datetime.fromisoformat(start_time_str)
+                    if event_datetime.tzinfo is None:
+                        event_datetime = event_datetime.replace(tzinfo=timezone.utc)
+                    
+                    time_until = event_datetime - current_time
+                    
+                    # Skip events that have already passed
+                    if time_until.total_seconds() <= 0:
+                        continue
+                    
+                    # Check each reminder interval
+                    for interval in REMINDER_INTERVALS:
+                        # Build reminder type code (e.g., "5d", "1d", "2h")
+                        reminder_type_code = ""
+                        if 'days' in interval:
+                            reminder_type_code = f"{interval['days']}d"
+                        elif 'hours' in interval:
+                            reminder_type_code = f"{interval['hours']}h"
+                        
+                        # Check if reminder already sent
+                        reminder_response = supabase.table('event_reminders').select('*').eq('event_id', event['id']).eq('reminder_type', reminder_type_code).execute()
+                        already_sent = len(reminder_response.data) > 0 if reminder_response.data else False
+                        
+                        if already_sent:
+                            continue
+                        
+                        # Calculate the target time for this reminder
+                        reminder_time = event_datetime
+                        if 'days' in interval:
+                            reminder_time = reminder_time - timedelta(days=interval['days'])
+                        if 'hours' in interval:
+                            reminder_time = reminder_time - timedelta(hours=interval['hours'])
+                        
+                        # Check if it's time to send this reminder (within 5 minutes)
+                        time_to_reminder = reminder_time - current_time
+                        if abs(time_to_reminder.total_seconds()) <= 300:  # Within 5 minutes
+                            
+                            # Create rich embed with event details
+                            embed = discord.Embed(
+                                title="📢 Event Reminder",
+                                description=f"@everyone\n\n**{event['name']}** is happening in **{interval['message']}**!",
+                                color=discord.Color.orange()
+                            )
+                            
+                            # Add flyer image if available
+                            if event.get('flyer_url'):
+                                embed.set_image(url=event['flyer_url'])
+                            
+                            # Format date/time
+                            date_str = event_datetime.strftime('%B %d, %Y at %I:%M %p')
+                            embed.add_field(
+                                name="📅 Date & Time",
+                                value=date_str,
+                                inline=True
+                            )
+                            
+                            days = time_until.days
+                            hours = time_until.seconds // 3600
+                            embed.add_field(
+                                name="⏰ Time Until",
+                                value=f"{days} days, {hours} hours",
+                                inline=True
+                            )
+                            
+                            if event.get('location'):
+                                embed.add_field(
+                                    name="📍 Location",
+                                    value=event['location'],
+                                    inline=True
+                                )
+                            
+                            if event.get('description'):
+                                # Discord embed field value limit is 1024 characters
+                                desc = event['description'][:1024]
+                                embed.add_field(
+                                    name="📝 Description",
+                                    value=desc,
+                                    inline=False
+                                )
+                            
+                            embed.set_footer(text=f"Event ID: {event['id']}")
+                            
+                            await announcements_channel.send(embed=embed)
+                            
+                            # Record that we sent this reminder
+                            try:
+                                supabase.table('event_reminders').insert({
+                                    'event_id': event['id'],
+                                    'reminder_type': reminder_type_code
+                                }).execute()
+                            except Exception as e:
+                                print(f"Error recording reminder: {e}")
+                            
+                            print(f"Sent {interval['message']} reminder for event: {event['name']}")
+                
+                # Check every 10 minutes
+                await asyncio.sleep(600)
+                
+            except Exception as e:
+                print(f"Error in event reminder checker: {e}")
+                import traceback
+                traceback.print_exc()
+                await asyncio.sleep(600)
 
