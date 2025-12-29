@@ -27,6 +27,13 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Support for recurring events (weekly meetings, etc.)
   - Configurable reminder times (1 day before, 1 hour before, etc.)
 
+- [x] **Deploy Bot (Always Running)**
+  - Deploy to hosting service (Heroku, Railway, DigitalOcean, etc.)
+  - Set up environment variables on hosting platform
+  - Configure auto-restart on crash
+  - Set up monitoring/uptime checks
+  - Ensure bot stays online 24/7
+
 ---
 ## In Progress
 
@@ -34,12 +41,6 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
 
 ## 📋 To Do
 
-- [ ] **Deploy Bot (Always Running)**
-  - Deploy to hosting service (Heroku, Railway, DigitalOcean, etc.)
-  - Set up environment variables on hosting platform
-  - Configure auto-restart on crash
-  - Set up monitoring/uptime checks
-  - Ensure bot stays online 24/7
 
 ## Maybes
 
