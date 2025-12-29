@@ -17,7 +17,7 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Warn users on violations
   - Detect a spam message from a bot and delete it
 
-- [x] **Role Management System**
+- [x] **Role Management System (Discord Onboarding Handled Everything)**
   - **Majors**: Add roles for different majors (Computer Engineering, Electrical Engineering, etc.)
   - **School Year**: Add roles for Freshman, Sophomore, Junior, Senior, Graduate
   - Self-assignable role menu/buttons
@@ -33,11 +33,6 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Automatic reminders for scheduled events
   - Support for recurring events (weekly meetings, etc.)
   - Configurable reminder times (1 day before, 1 hour before, etc.)
-
-- [ ] **Welcome Messages**
-  - Custom welcome message when users join
-  - DM with server rules and important info
-  - Welcome embed with server info
 
 - [ ] **Deploy Bot (Always Running)**
   - Deploy to hosting service (Heroku, Railway, DigitalOcean, etc.)
