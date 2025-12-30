@@ -229,8 +229,15 @@ def setup_events(bot: commands.Bot, supabase_client=None):
                             if event.get('flyer_url'):
                                 embed.set_image(url=event['flyer_url'])
                             
-                            # Format date/time
-                            date_str = event_datetime.strftime('%B %d, %Y at %I:%M %p')
+                            # Format date/time - convert UTC to Eastern Time
+                            try:
+                                from zoneinfo import ZoneInfo
+                                eastern_time = event_datetime.astimezone(ZoneInfo('America/New_York'))
+                            except ImportError:
+                                # Fallback for Python < 3.9
+                                eastern_offset = timezone(timedelta(hours=-5))
+                                eastern_time = event_datetime.astimezone(eastern_offset)
+                            date_str = eastern_time.strftime('%B %d, %Y at %I:%M %p %Z')
                             embed.add_field(
                                 name="📅 Date & Time",
                                 value=date_str,
