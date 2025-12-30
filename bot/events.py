@@ -222,7 +222,7 @@ def setup_events(bot: commands.Bot, supabase_client=None):
                             embed = discord.Embed(
                                 title="📢 Event Reminder",
                                 description=f"@everyone\n\n**{event['name']}** is happening in **{interval['message']}**!",
-                                color=discord.Color.orange()
+                                color=discord.Color.teal()
                             )
                             
                             # Add flyer image if available
