@@ -56,12 +56,10 @@ Note for Lincy: Feel free to add any ideas of your own ^-^
   - Scheduled announcements
 
 - [ ] **Fun Commands**
-  - `/meme` - Random meme generator
-  - `/joke` - Random jokes
-  - `/8ball` - Magic 8-ball responses
-  - `/poll` - Create polls
-  - `/quote` - Random inspirational quotes
+  - `!meme` - Random meme generator ✅
+  - `!dadjoke` - Random dad jokes ✅
+  - `!quote` - Random inspirational quotes ✅
 
 ---
 
-**Last Updated:** December 25, 2025
+**Last Updated:** December 29, 2025

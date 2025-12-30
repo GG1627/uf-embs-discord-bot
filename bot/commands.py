@@ -4,8 +4,9 @@ import os
 import json
 import discord
 from discord.ext import commands
+import requests
 from bot.views import MajorView, VerifyView, YearView
-from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID, RULES_SAVE_FILE, RULES_CHANNEL_ID
 
 
 def setup_commands(bot: commands.Bot):
@@ -102,7 +103,7 @@ def setup_commands(bot: commands.Bot):
             embed = discord.Embed(
                 title="📅 Upcoming Events",
                 description=f"Found {len(events)} upcoming events. Monitoring for reminders.",
-                color=discord.Color.blue()
+                color=discord.Color.blurple()
             )
             
             for event in events:
@@ -160,7 +161,7 @@ def setup_commands(bot: commands.Bot):
             
             embed = discord.Embed(
                 title=f"📅 {event['name']}",
-                color=discord.Color.blue()
+                color=discord.Color.blurple()
             )
             
             if event.get('flyer_url'):
@@ -217,4 +218,139 @@ def setup_commands(bot: commands.Bot):
             await ctx.send(f"❌ Error getting event details: {str(e)}")
             import traceback
             traceback.print_exc()
+
+    @bot.command()
+    async def dadjoke(ctx):
+        """Get a random dad joke."""
+        try:
+            headers = {'Accept': 'application/json'}
+            response = requests.get('https://icanhazdadjoke.com/', headers=headers)
+
+            if response.status_code == 200:
+                joke_data = response.json()
+                joke = joke_data.get('joke', 'Sorry, couldn\'t fetch a joke right now!')
+                await ctx.send(f"{joke}")
+            else:
+                await ctx.send("❌ Sorry, I couldn't fetch a dad joke right now!")
+
+        except Exception as e:
+            await ctx.send("❌ Sorry, something went wrong while fetching the joke!")
+            print(f"Error fetching dad joke: {e}")
+
+    @bot.command()
+    async def meme(ctx):
+        """Get a random meme."""
+        try:
+            response = requests.get('https://meme-api.com/gimme/1')
+
+            if response.status_code == 200:
+                meme_data = response.json()
+                if meme_data.get('memes') and len(meme_data['memes']) > 0:
+                    meme = meme_data['memes'][0]
+                    embed = discord.Embed(
+                        title=meme.get('title', 'Random Meme'),
+                        url=meme.get('postLink', ''),
+                        color=discord.Color.blue()
+                    )
+                    embed.set_image(url=meme['url'])
+                    embed.set_footer(text=f"From r/{meme.get('subreddit', 'unknown')} • {meme.get('ups', 0)} upvotes")
+
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Sorry, couldn't fetch a meme right now!")
+            else:
+                await ctx.send("❌ Sorry, I couldn't fetch a meme right now!")
+
+        except Exception as e:
+            await ctx.send("❌ Sorry, something went wrong while fetching the meme!")
+            print(f"Error fetching meme: {e}")
+
+    @bot.command()
+    async def quote(ctx):
+        """Get a random inspirational quote."""
+        try:
+            response = requests.get('https://zenquotes.io/api/random')
+
+            if response.status_code == 200:
+                quote_data = response.json()
+                if quote_data and len(quote_data) > 0:
+                    quote = quote_data[0]
+                    embed = discord.Embed(
+                        description=f'"{quote.get("q", "No quote found")}"',
+                        color=discord.Color.blue()
+                    )
+                    embed.set_footer(text=f"— {quote.get('a', 'Unknown Author')}")
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Sorry, couldn't fetch a quote right now!")
+            else:
+                await ctx.send("❌ Sorry, I couldn't fetch a quote right now!")
+
+        except Exception as e:
+            await ctx.send("❌ Sorry, something went wrong while fetching the quote!")
+            print(f"Error fetching quote: {e}")
+
+    @bot.command()
+    @commands.has_permissions(manage_guild=True)
+    async def setuprules(ctx):
+        """Set up the rules message in the rules channel."""
+        # if we already have message saved dont create a new one
+        if os.path.exists(RULES_SAVE_FILE):
+            return await ctx.send("Rules message already exists.")
+
+        # Use configured channel or the channel where command is run
+        if RULES_CHANNEL_ID:
+            rules_channel = bot.get_channel(RULES_CHANNEL_ID)
+            if not rules_channel:
+                return await ctx.send(f"Rules channel not found! Check RULES_CHANNEL_ID: {RULES_CHANNEL_ID}")
+        else:
+            rules_channel = ctx.channel
+
+        embed = discord.Embed(
+            title="📋 Server Rules & Commands",
+            description="Welcome to our Discord server! Please follow these rules and enjoy using our bot commands.",
+            color=discord.Color.green()
+        )
+
+        # Rules section
+        rules_text = """
+1. Be respectful to all members
+2. No spam or excessive caps
+3. Keep content appropriate for all ages
+4. Follow Discord's Terms of Service
+5. Use appropriate channels for topics
+        """.strip()
+
+        embed.add_field(
+            name="📜 Server Rules",
+            value=rules_text,
+            inline=False
+        )
+
+        # Commands section
+        commands_text = """
+`!meme` - Get a random meme
+`!dadjoke` - Get a random dad joke
+`!quote` - Get an inspirational quote
+        """.strip()
+
+        embed.add_field(
+            name="🎮 Available Commands",
+            value=commands_text,
+            inline=False
+        )
+
+        embed.set_footer(text="These rules help keep our community friendly and fun!")
+
+        msg = await rules_channel.send(embed=embed)
+
+        # save the message + channel so we know it exists
+        data = {
+            "message_id": msg.id,
+            "channel_id": rules_channel.id,
+        }
+        with open(RULES_SAVE_FILE, "w") as f:
+            json.dump(data, f)
+
+        await ctx.send("Rules message created successfully 🎉")
 
