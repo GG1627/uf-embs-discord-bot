@@ -333,11 +333,21 @@ def setup_commands(bot: commands.Bot):
 
         # Rules section
         rules_text = """
-1. Be respectful to all members
-2. No spam or excessive caps
-3. Keep content appropriate for all ages
-4. Follow Discord's Terms of Service
-5. Use appropriate channels for topics
+1. Be respectful. No harassment, hate speech, discrimination, or personal attacks.
+
+2. Keep it friendly & welcoming. Treat others the way you want to be treated.
+
+3. Use channels appropriately. Keep topics in the correct channels.
+
+4. No spam or excessive self-promotion. Ask a moderator if unsure.
+
+5. Keep content appropriate. No NSFW, illegal, or harmful content.
+
+6. Protect privacy. Don’t share personal info without permission.
+
+7. Follow Discord’s Terms of Service & Community Guidelines.
+
+8. Listen to moderators. Staff decisions are final — if you have concerns, message them privately.
         """.strip()
 
         embed.add_field(
