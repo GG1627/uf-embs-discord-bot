@@ -311,6 +311,18 @@ def setup_commands(bot: commands.Bot):
 
     @bot.command()
     @commands.has_permissions(manage_guild=True)
+    async def fun1(ctx):
+        """Display a fun fact about UF EMBS."""
+        await ctx.send("Did you know that UF EMBS was founded in 2025?")
+
+    @bot.command()
+    @commands.has_permissions(manage_guild=True)
+    async def fun2(ctx):
+        """Display a fun fact about biomedical engineering."""
+        await ctx.send("Biomedical engineers are now 3D printing functional mini organs from a patient's own cells, like heart tissue that beats in a dish, which can be used to test personalized drugs without ever entering the body.")
+
+    @bot.command()
+    @commands.has_permissions(manage_guild=True)
     async def setuprules(ctx):
         """Set up the rules message in the rules channel."""
         # if we already have message saved dont create a new one

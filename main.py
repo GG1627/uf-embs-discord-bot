@@ -45,14 +45,37 @@ setup_commands(bot)
 
 # Run the bot
 if __name__ == "__main__":
+    # Defensive check for Discord token
+    if not DISCORD_TOKEN:
+        print("❌ CRITICAL ERROR: DISCORD_TOKEN environment variable is missing!")
+        print("   Please set DISCORD_TOKEN in your environment variables or .env file.")
+        exit(1)
+
     # Start Flask app in a thread to keep the bot alive
     def run_flask():
         port = int(os.environ.get('PORT', 8080))
         app.run(host='0.0.0.0', port=port)
-    
+
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
-    # Run the Discord bot
+
+    # Run the Discord bot with error handling
     handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-    bot.run(DISCORD_TOKEN, log_handler=handler, log_level=logging.INFO)
+
+    try:
+        print("🚀 Starting Discord bot...")
+        bot.run(DISCORD_TOKEN, log_handler=handler, log_level=logging.INFO)
+    except discord.LoginFailure as e:
+        print(f"❌ CRITICAL ERROR: Discord login failed! Check your DISCORD_TOKEN.")
+        print(f"   Error details: {e}")
+        exit(1)
+    except discord.PrivilegedIntentsRequired as e:
+        print(f"❌ CRITICAL ERROR: Privileged intents required but not enabled!")
+        print(f"   Error details: {e}")
+        print("   Enable 'Server Members Intent' and 'Message Content Intent' in your bot settings.")
+        exit(1)
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR: Unexpected error starting Discord bot!")
+        print(f"   Error details: {e}")
+        print("   Check discord.log for more detailed error information.")
+        exit(1)
