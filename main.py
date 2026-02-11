@@ -3,6 +3,7 @@
 import discord
 from discord.ext import commands
 import logging
+import asyncio
 from dotenv import load_dotenv
 import os
 from supabase import create_client, Client
@@ -43,6 +44,60 @@ bot.supabase = supabase
 setup_events(bot, supabase)
 setup_commands(bot)
 
+async def start_bot_with_retry():
+    """Start the bot with exponential backoff on rate limits."""
+    max_retries = 5
+    base_delay = 60  # Start with 60 seconds
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"🚀 Starting Discord bot (attempt {attempt + 1}/{max_retries})...")
+            await bot.start(DISCORD_TOKEN)
+            break  # If successful, exit the loop
+            
+        except discord.LoginFailure as e:
+            print(f"❌ CRITICAL ERROR: Discord login failed! Check your DISCORD_TOKEN.")
+            print(f"   Error details: {e}")
+            return  # Don't retry on auth failures
+            
+        except discord.PrivilegedIntentsRequired as e:
+            print(f"❌ CRITICAL ERROR: Privileged intents required but not enabled!")
+            print(f"   Error details: {e}")
+            print("   Enable 'Server Members Intent' and 'Message Content Intent' in your bot settings.")
+            return  # Don't retry on intent failures
+            
+        except discord.HTTPException as e:
+            if e.status == 429:  # Rate limited
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 60s, 120s, 240s, 480s, 960s
+                    wait_time = base_delay * (2 ** attempt)
+                    print(f"⏳ Rate limited! Waiting {wait_time} seconds before retry...")
+                    print(f"   (Attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    print(f"❌ Maximum retry attempts reached. Rate limit persists.")
+                    print(f"   Please wait several hours before redeploying.")
+                    return
+            else:
+                print(f"❌ HTTP Error: {e.status} - {e.text}")
+                if attempt < max_retries - 1:
+                    wait_time = 30
+                    print(f"⏳ Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    return
+                    
+        except Exception as e:
+            print(f"❌ Unexpected error starting Discord bot!")
+            print(f"   Error details: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 30
+                print(f"⏳ Retrying in {wait_time} seconds...")
+                await asyncio.sleep(wait_time)
+            else:
+                print(f"   Maximum retry attempts reached.")
+                return
+
 # Run the bot
 if __name__ == "__main__":
     # Defensive check for Discord token
@@ -53,29 +108,20 @@ if __name__ == "__main__":
 
     # Start Flask app in a thread to keep the bot alive
     def run_flask():
-        port = int(os.environ.get('PORT', 8080))
+        port = int(os.environ.get('PORT', 10000))  # Changed default to 10000 for Render
         app.run(host='0.0.0.0', port=port)
 
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
-    # Run the Discord bot with error handling
+    # Set up logging
     handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-
+    
+    # Run the Discord bot with retry logic
     try:
-        print("🚀 Starting Discord bot...")
-        bot.run(DISCORD_TOKEN, log_handler=handler, log_level=logging.INFO)
-    except discord.LoginFailure as e:
-        print(f"❌ CRITICAL ERROR: Discord login failed! Check your DISCORD_TOKEN.")
-        print(f"   Error details: {e}")
-        exit(1)
-    except discord.PrivilegedIntentsRequired as e:
-        print(f"❌ CRITICAL ERROR: Privileged intents required but not enabled!")
-        print(f"   Error details: {e}")
-        print("   Enable 'Server Members Intent' and 'Message Content Intent' in your bot settings.")
-        exit(1)
+        asyncio.run(start_bot_with_retry())
+    except KeyboardInterrupt:
+        print("👋 Bot stopped by user")
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: Unexpected error starting Discord bot!")
-        print(f"   Error details: {e}")
-        print("   Check discord.log for more detailed error information.")
+        print(f"❌ Fatal error in main loop: {e}")
         exit(1)
