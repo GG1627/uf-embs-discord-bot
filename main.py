@@ -114,17 +114,19 @@ async def start_bot_with_retry():
 
 # Run the bot
 if __name__ == "__main__":
-    print("=" * 50)
-    print("🔧 MAIN.PY STARTED")
-    print("=" * 50)
+    import sys
+    
+    print("=" * 50, flush=True)
+    print("🔧 MAIN.PY STARTED", flush=True)
+    print("=" * 50, flush=True)
     
     # Defensive check for Discord token
     if not DISCORD_TOKEN:
-        print("❌ CRITICAL ERROR: DISCORD_TOKEN environment variable is missing!")
-        print("   Please set DISCORD_TOKEN in your environment variables or .env file.")
+        print("❌ CRITICAL ERROR: DISCORD_TOKEN environment variable is missing!", flush=True)
+        print("   Please set DISCORD_TOKEN in your environment variables or .env file.", flush=True)
         exit(1)
     
-    print("✅ Discord token found")
+    print("✅ Discord token found", flush=True)
 
     # Start Flask app in a thread to keep the bot alive
     import threading
@@ -137,44 +139,47 @@ if __name__ == "__main__":
         log.setLevel(logging.ERROR)
         
         # Signal that we're about to start
-        print("🌐 Flask thread: Starting server...")
+        print("🌐 Flask thread: Starting server...", flush=True)
         flask_started.set()
         
         app.run(host='0.0.0.0', port=port, use_reloader=False)
 
-    print("🌐 Creating Flask thread...")
+    print("🌐 Creating Flask thread...", flush=True)
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    print("⏱️ Waiting for Flask to signal ready...")
+    print("⏱️ Waiting for Flask to signal ready...", flush=True)
     flask_started.wait(timeout=5)
-    print("✅ Flask signaled ready!")
+    print("✅ Flask signaled ready!", flush=True)
     
-    print("⏱️ Additional 1 second buffer...")
+    print("⏱️ Additional 1 second buffer...", flush=True)
+    sys.stdout.flush()
     time.sleep(1)
-    print("✅ Sleep completed!")
+    print("✅ Sleep completed!", flush=True)
 
     # Set up logging
-    print("📝 Setting up logging...")
+    print("📝 Setting up logging...", flush=True)
     try:
         handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-        print("✅ Logging setup complete!")
+        print("✅ Logging setup complete!", flush=True)
     except Exception as e:
-        print(f"⚠️ Logging setup failed: {e}")
+        print(f"⚠️ Logging setup failed: {e}", flush=True)
     
-    print("🤖 Starting Discord bot initialization...")
-    print(f"🔍 About to call asyncio.run()...")
+    print("🤖 Starting Discord bot initialization...", flush=True)
+    print(f"🔍 About to call asyncio.run()...", flush=True)
+    sys.stdout.flush()
     
     # Run the Discord bot with retry logic
     try:
-        print("🔍 Inside try block, calling asyncio.run()...")
+        print("🔍 Inside try block, calling asyncio.run()...", flush=True)
+        sys.stdout.flush()
         asyncio.run(start_bot_with_retry())
-        print("✅ asyncio.run() completed")
+        print("✅ asyncio.run() completed", flush=True)
     except KeyboardInterrupt:
-        print("👋 Bot stopped by user")
+        print("👋 Bot stopped by user", flush=True)
     except Exception as e:
-        print(f"❌ Fatal error in main loop: {e}")
+        print(f"❌ Fatal error in main loop: {e}", flush=True)
         traceback.print_exc()
         exit(1)
     
-    print("🏁 Main.py execution complete")
+    print("🏁 Main.py execution complete", flush=True)
