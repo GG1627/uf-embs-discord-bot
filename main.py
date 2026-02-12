@@ -44,58 +44,73 @@ bot.supabase = supabase
 setup_events(bot, supabase)
 setup_commands(bot)
 
+async def safe_bot_close():
+    """Close the bot cleanly to avoid unclosed aiohttp sessions. Safe to call even if not fully started."""
+    try:
+        await bot.close()
+    except Exception:
+        pass
+
+
 async def start_bot_with_retry():
     """Start the bot with exponential backoff on rate limits."""
     max_retries = 5
-    base_delay = 60  # Start with 60 seconds
-    
+    base_delay = 120  # Start with 120 seconds for rate limits (was 60)
+
     for attempt in range(max_retries):
         try:
             print(f"🚀 Starting Discord bot (attempt {attempt + 1}/{max_retries})...")
             await bot.start(DISCORD_TOKEN)
             break  # If successful, exit the loop
-            
+
         except discord.LoginFailure as e:
             print(f"❌ CRITICAL ERROR: Discord login failed! Check your DISCORD_TOKEN.")
             print(f"   Error details: {e}")
+            await safe_bot_close()
             return  # Don't retry on auth failures
-            
+
         except discord.PrivilegedIntentsRequired as e:
             print(f"❌ CRITICAL ERROR: Privileged intents required but not enabled!")
             print(f"   Error details: {e}")
             print("   Enable 'Server Members Intent' and 'Message Content Intent' in your bot settings.")
+            await safe_bot_close()
             return  # Don't retry on intent failures
-            
+
         except discord.HTTPException as e:
             if e.status == 429:  # Rate limited
                 if attempt < max_retries - 1:
-                    # Exponential backoff: 60s, 120s, 240s, 480s, 960s
                     wait_time = base_delay * (2 ** attempt)
                     print(f"⏳ Rate limited! Waiting {wait_time} seconds before retry...")
                     print(f"   (Attempt {attempt + 1}/{max_retries})")
+                    await safe_bot_close()
                     await asyncio.sleep(wait_time)
                 else:
                     print(f"❌ Maximum retry attempts reached. Rate limit persists.")
                     print(f"   Please wait several hours before redeploying.")
+                    await safe_bot_close()
                     return
             else:
                 print(f"❌ HTTP Error: {e.status} - {e.text}")
                 if attempt < max_retries - 1:
                     wait_time = 30
                     print(f"⏳ Retrying in {wait_time} seconds...")
+                    await safe_bot_close()
                     await asyncio.sleep(wait_time)
                 else:
+                    await safe_bot_close()
                     return
-                    
+
         except Exception as e:
             print(f"❌ Unexpected error starting Discord bot!")
             print(f"   Error details: {e}")
             if attempt < max_retries - 1:
                 wait_time = 30
                 print(f"⏳ Retrying in {wait_time} seconds...")
+                await safe_bot_close()
                 await asyncio.sleep(wait_time)
             else:
                 print(f"   Maximum retry attempts reached.")
+                await safe_bot_close()
                 return
 
 # Run the bot
