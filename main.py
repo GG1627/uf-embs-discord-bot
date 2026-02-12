@@ -82,7 +82,6 @@ async def start_bot_with_retry():
                     wait_time = base_delay * (2 ** attempt)
                     print(f"⏳ Rate limited! Waiting {wait_time} seconds before retry...")
                     print(f"   (Attempt {attempt + 1}/{max_retries})")
-                    await safe_bot_close()
                     await asyncio.sleep(wait_time)
                 else:
                     print(f"❌ Maximum retry attempts reached. Rate limit persists.")
@@ -94,7 +93,6 @@ async def start_bot_with_retry():
                 if attempt < max_retries - 1:
                     wait_time = 30
                     print(f"⏳ Retrying in {wait_time} seconds...")
-                    await safe_bot_close()
                     await asyncio.sleep(wait_time)
                 else:
                     await safe_bot_close()
@@ -106,7 +104,6 @@ async def start_bot_with_retry():
             if attempt < max_retries - 1:
                 wait_time = 30
                 print(f"⏳ Retrying in {wait_time} seconds...")
-                await safe_bot_close()
                 await asyncio.sleep(wait_time)
             else:
                 print(f"   Maximum retry attempts reached.")
