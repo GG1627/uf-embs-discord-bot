@@ -12,6 +12,8 @@ from bot.commands import setup_commands
 from bot.config import DATA_DIR
 from threading import Thread
 from keep_alive import app
+import time
+import traceback
 
 # Load environment variables
 load_dotenv()
@@ -55,7 +57,7 @@ async def safe_bot_close():
 async def start_bot_with_retry():
     """Start the bot with exponential backoff on rate limits."""
     max_retries = 5
-    base_delay = 120  # Start with 120 seconds for rate limits (was 60)
+    base_delay = 120  # Start with 120 seconds for rate limits
 
     for attempt in range(max_retries):
         try:
@@ -101,6 +103,8 @@ async def start_bot_with_retry():
         except Exception as e:
             print(f"❌ Unexpected error starting Discord bot!")
             print(f"   Error details: {e}")
+            print(f"   Full traceback:")
+            traceback.print_exc()
             if attempt < max_retries - 1:
                 wait_time = 30
                 print(f"⏳ Retrying in {wait_time} seconds...")
@@ -112,22 +116,38 @@ async def start_bot_with_retry():
 
 # Run the bot
 if __name__ == "__main__":
+    print("=" * 50)
+    print("🔧 MAIN.PY STARTED")
+    print("=" * 50)
+    
     # Defensive check for Discord token
     if not DISCORD_TOKEN:
         print("❌ CRITICAL ERROR: DISCORD_TOKEN environment variable is missing!")
         print("   Please set DISCORD_TOKEN in your environment variables or .env file.")
         exit(1)
+    
+    print("✅ Discord token found")
 
     # Start Flask app in a thread to keep the bot alive
     def run_flask():
-        port = int(os.environ.get('PORT', 10000))  # Changed default to 10000 for Render
+        port = int(os.environ.get('PORT', 10000))
+        # Disable Flask logging to reduce noise
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
         app.run(host='0.0.0.0', port=port)
 
+    print("🌐 Starting Flask server in background thread...")
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
+    
+    print("⏱️  Waiting 2 seconds for Flask to initialize...")
+    time.sleep(2)
 
     # Set up logging
+    print("📝 Setting up logging...")
     handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+    
+    print("🤖 Starting Discord bot initialization...")
     
     # Run the Discord bot with retry logic
     try:
@@ -136,4 +156,7 @@ if __name__ == "__main__":
         print("👋 Bot stopped by user")
     except Exception as e:
         print(f"❌ Fatal error in main loop: {e}")
+        traceback.print_exc()
         exit(1)
+    
+    print("🏁 Main.py execution complete")
