@@ -35,7 +35,7 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         
         # Start the event reminder checker if Supabase is available
         if supabase_client:
-            bot.loop.create_task(check_event_reminders(bot, supabase_client))
+            asyncio.create_task(check_event_reminders(bot, supabase_client))
             print("Event reminder system started")
         else:
             print("Event reminder system disabled - Supabase not available")
