@@ -24,12 +24,8 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Initialize Supabase client (only if credentials are provided)
+# Don't create Supabase client yet - will create after bot starts
 supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-else:
-    print("⚠️ Warning: Supabase credentials not found. Verification feature will be disabled.")
 
 # Set up bot intents
 intents = discord.Intents.default()
@@ -39,11 +35,13 @@ intents.message_content = True
 # Create bot instance
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Store supabase client on bot instance for access in commands/views
-bot.supabase = supabase
+# Store supabase credentials on bot for later initialization
+bot.supabase_url = SUPABASE_URL
+bot.supabase_key = SUPABASE_SERVICE_ROLE_KEY
+bot.supabase = None  # Will be set in on_ready
 
 # Set up events and commands
-setup_events(bot, supabase)
+setup_events(bot)
 setup_commands(bot)
 
 async def safe_bot_close():
@@ -142,16 +140,21 @@ if __name__ == "__main__":
     
     print("⏱️  Waiting 2 seconds for Flask to initialize...")
     time.sleep(2)
+    print("✅ Sleep completed!")
 
     # Set up logging
     print("📝 Setting up logging...")
     handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+    print("✅ Logging setup complete!")
     
     print("🤖 Starting Discord bot initialization...")
+    print(f"🔍 About to call asyncio.run()...")
     
     # Run the Discord bot with retry logic
     try:
+        print("🔍 Inside try block, calling asyncio.run()...")
         asyncio.run(start_bot_with_retry())
+        print("✅ asyncio.run() completed")
     except KeyboardInterrupt:
         print("👋 Bot stopped by user")
     except Exception as e:

@@ -15,6 +15,20 @@ def setup_events(bot: commands.Bot, supabase_client=None):
     @bot.event
     async def on_ready():
         print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+        
+        # Initialize Supabase client NOW (after bot is connected)
+        from supabase import create_client
+        supabase_client = None
+        if bot.supabase_url and bot.supabase_key:
+            try:
+                print("🔧 Initializing Supabase client...")
+                supabase_client = create_client(bot.supabase_url, bot.supabase_key)
+                bot.supabase = supabase_client
+                print("✅ Supabase client initialized")
+            except Exception as e:
+                print(f"⚠️ Failed to initialize Supabase: {e}")
+        else:
+            print("⚠️ Supabase credentials not found. Verification feature will be disabled.")
 
         # Check if verification is already set up, if not, remind admin
         if not os.path.exists(VERIFY_SAVE_FILE):
