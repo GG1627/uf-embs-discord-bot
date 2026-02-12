@@ -127,25 +127,40 @@ if __name__ == "__main__":
     print("✅ Discord token found")
 
     # Start Flask app in a thread to keep the bot alive
+    import threading
+    flask_started = threading.Event()
+    
     def run_flask():
         port = int(os.environ.get('PORT', 10000))
         # Disable Flask logging to reduce noise
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
-        app.run(host='0.0.0.0', port=port)
+        
+        # Signal that we're about to start
+        print("🌐 Flask thread: Starting server...")
+        flask_started.set()
+        
+        app.run(host='0.0.0.0', port=port, use_reloader=False)
 
-    print("🌐 Starting Flask server in background thread...")
+    print("🌐 Creating Flask thread...")
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    print("⏱️  Waiting 2 seconds for Flask to initialize...")
-    time.sleep(2)
+    print("⏱️ Waiting for Flask to signal ready...")
+    flask_started.wait(timeout=5)
+    print("✅ Flask signaled ready!")
+    
+    print("⏱️ Additional 1 second buffer...")
+    time.sleep(1)
     print("✅ Sleep completed!")
 
     # Set up logging
     print("📝 Setting up logging...")
-    handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-    print("✅ Logging setup complete!")
+    try:
+        handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+        print("✅ Logging setup complete!")
+    except Exception as e:
+        print(f"⚠️ Logging setup failed: {e}")
     
     print("🤖 Starting Discord bot initialization...")
     print(f"🔍 About to call asyncio.run()...")
