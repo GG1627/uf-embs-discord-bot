@@ -10,9 +10,6 @@ from supabase import create_client, Client
 from bot.events import setup_events
 from bot.commands import setup_commands
 from bot.config import DATA_DIR
-from threading import Thread
-from keep_alive import app
-import time
 import traceback
 
 # Load environment variables
@@ -122,10 +119,9 @@ def _log(msg: str, flush: bool = True) -> None:
 # Run the bot
 if __name__ == "__main__":
     import sys
-    # Force line-buffered stdout so deploy logs show every line immediately (no buffering delay)
+    # Force line-buffered stdout so deploy logs show every line immediately
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
-    # On Render, also set env PYTHONUNBUFFERED=1 if logs still appear late
 
     print("=" * 50, flush=True)
     print("🔧 MAIN.PY STARTED", flush=True)
@@ -139,35 +135,6 @@ if __name__ == "__main__":
     
     print("✅ Discord token found", flush=True)
 
-    # Start Flask app in a thread to keep the bot alive
-    import threading
-    flask_started = threading.Event()
-    
-    def run_flask():
-        port = int(os.environ.get('PORT', 10000))
-        # Disable Flask logging to reduce noise
-        log = logging.getLogger('werkzeug')
-        log.setLevel(logging.ERROR)
-        
-        # Signal that we're about to start
-        print("🌐 Flask thread: Starting server...", flush=True)
-        flask_started.set()
-        
-        app.run(host='0.0.0.0', port=port, use_reloader=False)
-
-    print("🌐 Creating Flask thread...", flush=True)
-    flask_thread = Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    
-    print("⏱️ Waiting for Flask to signal ready...", flush=True)
-    flask_started.wait(timeout=5)
-    print("✅ Flask signaled ready!", flush=True)
-    
-    print("⏱️ Additional 1 second buffer...", flush=True)
-    sys.stdout.flush()
-    time.sleep(1)
-    print("✅ Sleep completed!", flush=True)
-
     # Set up logging
     print("📝 Setting up logging...", flush=True)
     try:
@@ -176,14 +143,10 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"⚠️ Logging setup failed: {e}", flush=True)
     
-    print("🤖 Starting Discord bot initialization...", flush=True)
-    print(f"🔍 About to call asyncio.run()...", flush=True)
-    sys.stdout.flush()
+    print("🤖 Starting Discord bot...", flush=True)
     
     # Run the Discord bot with retry logic
     try:
-        print("🔍 Inside try block, calling asyncio.run()...", flush=True)
-        sys.stdout.flush()
         asyncio.run(start_bot_with_retry())
         print("✅ asyncio.run() completed", flush=True)
     except KeyboardInterrupt:
