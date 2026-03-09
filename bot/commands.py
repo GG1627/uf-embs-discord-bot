@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 import requests
 from bot.views import MajorView, VerifyView, YearView
-from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID, RULES_SAVE_FILE, RULES_CHANNEL_ID
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID, RULES_SAVE_FILE, RULES_CHANNEL_ID, REMINDER_INTERVALS
 
 
 def setup_commands(bot: commands.Bot):
@@ -219,9 +219,15 @@ def setup_commands(bot: commands.Bot):
             sent_reminders = [r['reminder_type'] for r in reminders_response.data] if reminders_response.data else []
             
             reminder_status = []
-            for interval in [('5d', '5 days'), ('2d', '2 days'), ('1d', '1 day'), ('10h', '10 hours'), ('2h', '2 hours')]:
-                status = "✅ Sent" if interval[0] in sent_reminders else "⏳ Pending"
-                reminder_status.append(f"{interval[1]}: {status}")
+            for interval in REMINDER_INTERVALS:
+                if 'days' in interval:
+                    code = f"{interval['days']}d"
+                elif 'hours' in interval:
+                    code = f"{interval['hours']}h"
+                else:
+                    continue
+                status = "✅ Sent" if code in sent_reminders else "⏳ Pending"
+                reminder_status.append(f"{interval['message']}: {status}")
             
             embed.add_field(
                 name="🔔 Reminder Status",
@@ -394,4 +400,20 @@ def setup_commands(bot: commands.Bot):
             json.dump(data, f)
 
         await ctx.send("Rules message created successfully 🎉")
+
+    @bot.command()
+    @commands.has_permissions(manage_guild=True)
+    async def syncevents(ctx):
+        """Manually trigger Discord scheduled event sync."""
+        from bot.events import sync_discord_scheduled_events_once
+        supabase = getattr(bot, 'supabase', None)
+        if not supabase:
+            return await ctx.send("❌ Supabase not configured!")
+        
+        await ctx.send("🔄 Syncing events to Discord Scheduled Events...")
+        try:
+            count = await sync_discord_scheduled_events_once(bot, supabase)
+            await ctx.send(f"✅ Sync complete! Created **{count}** new scheduled event(s).")
+        except Exception as e:
+            await ctx.send(f"❌ Sync failed: {e}")
 
