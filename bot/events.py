@@ -362,10 +362,44 @@ def setup_events(bot: commands.Bot, supabase_client=None):
                 await asyncio.sleep(900)
 
 
+def _sync_tag(supabase_id: str) -> str:
+    """Return a hidden tag embedded in Discord event descriptions to track the Supabase source ID."""
+    return f"\n\n[sync:{supabase_id}]"
+
+
+def _extract_sync_id(description: str | None) -> str | None:
+    """Extract the Supabase event ID from a Discord event description tag."""
+    if not description:
+        return None
+    import re
+    m = re.search(r'\[sync:([a-f0-9\-]+)\]', description)
+    return m.group(1) if m else None
+
+
+def _build_description(event: dict) -> str:
+    """Build the Discord event description with the sync tag appended."""
+    desc = (event.get('description') or '')[:950]
+    return desc + _sync_tag(event['id'])
+
+
+async def _fetch_flyer(url: str) -> bytes | None:
+    """Download a flyer image, returning bytes or None on failure."""
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    return await resp.read()
+    except Exception:
+        pass
+    return None
+
+
 async def sync_discord_scheduled_events_once(bot, supabase):
     """One-shot sync of Supabase events to Discord Scheduled Events.
     
-    Returns the number of new Discord scheduled events created.
+    Creates new events, updates existing ones when data has changed.
+    Returns a tuple (created_count, updated_count).
     """
     from datetime import datetime, timedelta, timezone
 
@@ -380,15 +414,22 @@ async def sync_discord_scheduled_events_once(bot, supabase):
     supabase_events = response.data if response.data else []
 
     created_count = 0
+    updated_count = 0
 
     for guild in bot.guilds:
         try:
             discord_events = await guild.fetch_scheduled_events()
 
-            existing = {}
+            # Map Supabase ID → Discord event via the sync tag in description
+            existing_by_sync_id = {}
+            # Fallback map for events created before sync tags were added
+            existing_by_name_time = {}
             for de in discord_events:
+                sync_id = _extract_sync_id(de.description)
+                if sync_id:
+                    existing_by_sync_id[sync_id] = de
                 key = (de.name, de.start_time.isoformat() if de.start_time else None)
-                existing[key] = de
+                existing_by_name_time[key] = de
 
             for event in supabase_events:
                 try:
@@ -404,14 +445,48 @@ async def sync_discord_scheduled_events_once(bot, supabase):
                         continue
 
                     event_name = event['name']
-                    key = (event_name, event_datetime.isoformat())
-
-                    if key in existing:
-                        continue
-
                     location = event.get('location') or 'TBA'
                     end_datetime = event_datetime + timedelta(hours=1)
+                    description = _build_description(event)
+                    supabase_id = event['id']
 
+                    discord_event = existing_by_sync_id.get(supabase_id)
+                    # Fallback: match by name + start_time for events created before sync tags
+                    if not discord_event:
+                        fallback_key = (event_name, event_datetime.isoformat())
+                        discord_event = existing_by_name_time.get(fallback_key)
+
+                    if discord_event:
+                        # Check if anything changed
+                        needs_update = False
+                        edit_kwargs = {}
+
+                        if discord_event.name != event_name:
+                            edit_kwargs['name'] = event_name
+                            needs_update = True
+                        if discord_event.start_time and discord_event.start_time.isoformat() != event_datetime.isoformat():
+                            edit_kwargs['start_time'] = event_datetime
+                            edit_kwargs['end_time'] = end_datetime
+                            needs_update = True
+                        if (discord_event.location or '') != location:
+                            edit_kwargs['location'] = location
+                            needs_update = True
+                        if (discord_event.description or '').strip() != description.strip():
+                            edit_kwargs['description'] = description
+                            needs_update = True
+
+                        if needs_update:
+                            if event.get('flyer_url'):
+                                image_data = await _fetch_flyer(event['flyer_url'])
+                                if image_data:
+                                    edit_kwargs['image'] = image_data
+
+                            await discord_event.edit(**edit_kwargs)
+                            print(f"Updated Discord scheduled event: {event_name}")
+                            updated_count += 1
+                        continue
+
+                    # Create new event
                     kwargs = {
                         'name': event_name,
                         'start_time': event_datetime,
@@ -419,31 +494,24 @@ async def sync_discord_scheduled_events_once(bot, supabase):
                         'entity_type': discord.EntityType.external,
                         'location': location,
                         'privacy_level': discord.PrivacyLevel.guild_only,
+                        'description': description,
                         'reason': 'Auto-synced from EMBS events',
                     }
 
-                    if event.get('description'):
-                        kwargs['description'] = event['description'][:1000]
-
                     if event.get('flyer_url'):
-                        try:
-                            import aiohttp
-                            async with aiohttp.ClientSession() as session:
-                                async with session.get(event['flyer_url'], timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                                    if resp.status == 200:
-                                        kwargs['image'] = await resp.read()
-                        except Exception:
-                            pass
+                        image_data = await _fetch_flyer(event['flyer_url'])
+                        if image_data:
+                            kwargs['image'] = image_data
 
                     await guild.create_scheduled_event(**kwargs)
                     print(f"Created Discord scheduled event: {event_name}")
                     created_count += 1
 
                 except discord.Forbidden:
-                    print(f"Missing permissions to create scheduled event in {guild.name}")
+                    print(f"Missing permissions to create/update scheduled event in {guild.name}")
                     break
                 except Exception as e:
-                    print(f"Error creating scheduled event '{event.get('name', '?')}': {e}")
+                    print(f"Error syncing scheduled event '{event.get('name', '?')}': {e}")
                     continue
 
         except discord.Forbidden:
@@ -451,4 +519,4 @@ async def sync_discord_scheduled_events_once(bot, supabase):
         except Exception as e:
             print(f"Error syncing scheduled events for guild {guild.name}: {e}")
 
-    return created_count
+    return created_count, updated_count

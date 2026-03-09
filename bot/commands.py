@@ -412,8 +412,8 @@ def setup_commands(bot: commands.Bot):
         
         await ctx.send("🔄 Syncing events to Discord Scheduled Events...")
         try:
-            count = await sync_discord_scheduled_events_once(bot, supabase)
-            await ctx.send(f"✅ Sync complete! Created **{count}** new scheduled event(s).")
+            created, updated = await sync_discord_scheduled_events_once(bot, supabase)
+            await ctx.send(f"✅ Sync complete! Created **{created}**, updated **{updated}** scheduled event(s).")
         except Exception as e:
             await ctx.send(f"❌ Sync failed: {e}")
 
