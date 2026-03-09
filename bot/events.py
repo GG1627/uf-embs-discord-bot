@@ -418,6 +418,7 @@ async def sync_discord_scheduled_events_once(bot, supabase):
                         'end_time': end_datetime,
                         'entity_type': discord.EntityType.external,
                         'location': location,
+                        'privacy_level': discord.PrivacyLevel.guild_only,
                         'reason': 'Auto-synced from EMBS events',
                     }
 

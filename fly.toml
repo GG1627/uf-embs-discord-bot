@@ -1,0 +1,11 @@
+app = 'embs-discord-bot'
+primary_region = 'dfw'
+
+[build]
+
+[processes]
+  app = 'python main.py'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'
