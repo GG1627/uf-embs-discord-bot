@@ -23,5 +23,5 @@ TOKEN_EXPIRY_MINUTES = 15
 REMINDER_INTERVALS = [
     {"days": 5, "message": "5 days"},
     {"days": 1, "message": "1 day"},
-    # {"hours": 2, "message": "2 hours"}
+    {"hours": 2, "message": "2 hours"}
 ]
