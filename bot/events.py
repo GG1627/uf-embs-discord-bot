@@ -362,16 +362,43 @@ def setup_events(bot: commands.Bot, supabase_client=None):
                 await asyncio.sleep(900)
 
 
+# Zero-width chars for invisible sync ID encoding (not shown in event description)
+_ZWSP = '\u200B'   # zero-width space
+_ZWNJ = '\u200C'   # zero-width non-joiner
+_SYNC_START = '\u200D\u200B'  # ZWJ+ZWSP = invisible start marker
+_SYNC_END = '\u200D\u200C'    # ZWJ+ZWNJ = invisible end marker
+
+
 def _sync_tag(supabase_id: str) -> str:
-    """Return a hidden tag embedded in Discord event descriptions to track the Supabase source ID."""
-    return f"\n\n[sync:{supabase_id}]"
+    """Return an invisible tag embedded in Discord event descriptions to track the Supabase source ID."""
+    hex_str = supabase_id.replace('-', '').lower()
+    encoded = []
+    for c in hex_str:
+        n = int(c, 16)
+        for i in range(4):
+            encoded.append(_ZWNJ if (n >> (3 - i)) & 1 else _ZWSP)
+    return _SYNC_START + ''.join(encoded) + _SYNC_END
 
 
 def _extract_sync_id(description: str | None) -> str | None:
-    """Extract the Supabase event ID from a Discord event description tag."""
+    """Extract the Supabase event ID from the invisible sync tag in a Discord event description."""
     if not description:
         return None
     import re
+    # Try invisible format first
+    if _SYNC_START in description:
+        pattern = re.escape(_SYNC_START) + r'([\u200B\u200C]{128})' + re.escape(_SYNC_END)
+        m = re.search(pattern, description)
+        if m:
+            bits = m.group(1)
+            hex_chars = []
+            for i in range(0, 128, 4):
+                nibble = sum((1 if bits[i + j] == _ZWNJ else 0) << (3 - j) for j in range(4))
+                hex_chars.append(f'{nibble:x}')
+            h = ''.join(hex_chars)
+            if len(h) == 32:
+                return f'{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}'
+    # Fallback: old visible format [sync:uuid] for backward compatibility
     m = re.search(r'\[sync:([a-f0-9\-]+)\]', description)
     return m.group(1) if m else None
 
