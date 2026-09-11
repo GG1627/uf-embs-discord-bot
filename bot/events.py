@@ -49,10 +49,12 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         
         # Start background tasks if Supabase is available (guard against duplicate on_ready)
         if supabase_client and not getattr(bot, '_reminder_task_started', False):
-            asyncio.create_task(check_event_reminders(bot, supabase_client))
+            # Event reminder announcements are intentionally disabled. Keep this
+            # line commented out so the feature can be restored later if needed.
+            # asyncio.create_task(check_event_reminders(bot, supabase_client))
             asyncio.create_task(sync_discord_scheduled_events(bot, supabase_client))
             bot._reminder_task_started = True
-            print("Event reminder system started")
+            print("Event reminder announcements disabled")
             print("Discord scheduled event sync started")
         elif not supabase_client:
             print("Event reminder system disabled - Supabase not available")
