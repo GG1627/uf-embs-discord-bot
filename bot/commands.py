@@ -19,7 +19,7 @@ def setup_commands(bot: commands.Bot):
         from datetime import timedelta
         import asyncio
         import io
-        from bot.reminders import build_reminder, event_start, scheduled_links
+        from bot.reminders import build_reminder, event_start
         from bot.events import _fetch_flyer
 
         if interval not in ('2d', '2h'):
@@ -32,12 +32,10 @@ def setup_commands(bot: commands.Bot):
             if not response.data:
                 return await ctx.send('Event not found.')
             event = response.data[0]
-            links = await scheduled_links(ctx.guild) if ctx.guild else {}
-            url = links.get(event['id']) or links.get((event['name'], event_start(event)))
             preview_time = event_start(event) - (timedelta(days=2) if interval == '2d' else timedelta(hours=2))
-            kwargs = {'content': build_reminder(event, preview_time, interval, url, ping=False),
+            kwargs = {'content': build_reminder(event, preview_time, interval, ping=False),
                       'allowed_mentions': discord.AllowedMentions.none()}
-            if interval == '2d' and event.get('flyer_url'):
+            if event.get('flyer_url'):
                 flyer = await _fetch_flyer(event['flyer_url'])
                 if flyer:
                     kwargs['file'] = discord.File(io.BytesIO(flyer), filename='event-flyer.png')

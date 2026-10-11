@@ -56,9 +56,12 @@ A Discord bot built with Python for the UF EMBS community.
 The bot checks every five minutes and posts regular messages in the configured
 announcements channel at two days and two hours before an event. The early
 reminder includes the event description as written (trimmed to 700 characters)
-and attaches its flyer when available. The final reminder omits both. Discord
-timestamps show the date and time in each member's timezone. RSVP links point
-to the matching Discord scheduled event when it is available.
+and both reminders attach the flyer when available. The final reminder omits
+the description. Details appear on separate calendar, clock, and location
+lines in Eastern Time (for example, `📅 Wednesday, October 7th`,
+`⏱️ 5:00 - 6:00 pm`, and `📍 Weimer Hall 1064`). The event's `end_time`
+is used when provided; otherwise the duration defaults to one hour, matching
+the scheduled-event sync.
 
 After downtime, only the latest applicable reminder is sent, using the actual
 time remaining. Existing reminder records prevent repeat deliveries.

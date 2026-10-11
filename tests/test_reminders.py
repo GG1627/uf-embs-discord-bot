@@ -51,6 +51,26 @@ class Database:
 
 
 class FormattingTests(unittest.TestCase):
+    def test_requested_eastern_format_for_both_reminders(self):
+        e = event()
+        e.update(start_time='2026-10-07T21:00:00Z', location='Weimer Hall 1064')
+        for code in ('2d', '2h'):
+            text = build_reminder(e, NOW - timedelta(days=5), code)
+            self.assertIn('📅 Wednesday, October 7th\n⏱️ 5:00 - 6:00 pm\n📍 Weimer Hall 1064', text)
+            self.assertNotIn('<t:', text)
+
+    def test_end_time_and_am_pm_transition(self):
+        e = event()
+        e.update(start_time='2026-01-21T16:30:00Z', end_time='2026-01-21T18:00:00Z')
+        text = build_reminder(e, NOW, '2d')
+        self.assertIn('January 21st', text)
+        self.assertIn('⏱️ 11:30 am - 1:00 pm', text)
+
+    def test_ordinal_teen_exception(self):
+        e = event()
+        e['start_time'] = '2026-10-11T21:00:00Z'
+        self.assertIn('October 11th', build_reminder(e, NOW, '2h'))
+
     def test_intervals_and_catchup(self):
         for hours, expected in [(49, None), (48, '2d'), (3, '2d'), (2, '2h'), (1, '2h'), (0, None), (-1, None)]:
             with self.subTest(hours=hours):
@@ -58,10 +78,10 @@ class FormattingTests(unittest.TestCase):
 
     def test_description_and_short_reminder(self):
         e = event()
-        full = build_reminder(e, NOW, '2d', 'https://discord.com/events/1/2')
+        full = build_reminder(e, NOW, '2d')
         self.assertIn(e['description'], full)
         self.assertNotIn('Join us for', full)
-        self.assertIn('View event & RSVP', full)
+        self.assertNotIn('View event & RSVP', full)
         short = build_reminder(event(1), NOW, '2h')
         self.assertIn('about 1 hour', short)
         self.assertNotIn(e['description'], short)
@@ -83,9 +103,6 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.runner = ReminderRunner(self.path)
         self.channel = SimpleNamespace(send=AsyncMock(), guild=SimpleNamespace(id=1))
         self.bot = SimpleNamespace(get_channel=lambda _: self.channel)
-        self.links = patch('bot.reminders.scheduled_links', new=AsyncMock(return_value={'test-event': 'https://discord.com/events/1/2'}))
-        self.links.start()
-        self.addCleanup(self.links.stop)
 
     async def test_normal_two_reminders_and_no_repeat(self):
         db = Database([event()])
@@ -132,7 +149,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             await self.runner.run_once(self.bot, db, NOW)
         self.channel.send.assert_not_awaited()
 
-    async def test_flyer_only_for_early_reminder(self):
+    async def test_flyer_for_both_reminders(self):
         e = event()
         e['flyer_url'] = 'https://example.com/flyer.png'
         db = Database([e])
@@ -140,8 +157,8 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             await self.runner.run_once(self.bot, db, NOW)
             self.assertIn('file', self.channel.send.call_args.kwargs)
             await self.runner.run_once(self.bot, db, NOW + timedelta(hours=46))
-            self.assertNotIn('file', self.channel.send.call_args.kwargs)
-            fetch.assert_awaited_once()
+            self.assertIn('file', self.channel.send.call_args.kwargs)
+            self.assertEqual(fetch.await_count, 2)
 
 
 if __name__ == '__main__':

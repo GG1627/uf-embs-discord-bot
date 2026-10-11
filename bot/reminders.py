@@ -6,6 +6,7 @@ import json
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import discord
 
@@ -31,7 +32,7 @@ def reminder_due(start, now):
     return min(due)[1] if due else None
 
 
-def build_reminder(event, now, code, event_url=None, ping=True):
+def build_reminder(event, now, code, ping=True):
     start = event_start(event)
     minutes = max(1, math.ceil((start - now).total_seconds() / 60))
     if minutes > 24 * 60:
@@ -47,25 +48,28 @@ def build_reminder(event, now, code, event_url=None, ping=True):
         if len(description) > 700:
             description = description[:697].rstrip() + '…'
         lines += ['', description]
-    # Discord timestamps display the exact date and time in each reader's timezone.
-    lines += ['', f"📅 <t:{int(start.timestamp())}:F>"]
+    eastern = ZoneInfo('America/New_York')
+    local_start = start.astimezone(eastern)
+    # Match scheduled events' one-hour duration when no end time is provided.
+    end = event_start({'start_time': event['end_time']}) if event.get('end_time') else start + timedelta(hours=1)
+    local_end = end.astimezone(eastern)
+    day = local_start.day
+    suffix = 'th' if 11 <= day % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+    date = f"{local_start.strftime('%A, %B')} {day}{suffix}"
+    def clock(value):
+        return f"{value.hour % 12 or 12}:{value.minute:02d}"
+    start_period = local_start.strftime('%p').lower()
+    end_period = local_end.strftime('%p').lower()
+    first = clock(local_start)
+    if start_period != end_period or local_start.date() != local_end.date():
+        first += f' {start_period}'
+    last = f'{clock(local_end)} {end_period}'
+    if local_start.date() != local_end.date():
+        last += f" ({local_end.strftime('%A, %B')} {local_end.day})"
+    lines += ['', f"📅 {date}", f"⏱️ {first} - {last}"]
     location = discord.utils.escape_mentions(event.get('location') or 'TBA')
     lines += [f"📍 {location[:250]}"]
-    if event_url:
-        lines += ['', f"View event & RSVP: <{event_url}>"]
     return '\n'.join(lines)
-
-
-async def scheduled_links(guild):
-    from bot.events import _extract_sync_id
-    links = {}
-    for event in await guild.fetch_scheduled_events():
-        sync_id = _extract_sync_id(event.description)
-        url = f"https://discord.com/events/{guild.id}/{event.id}"
-        if sync_id:
-            links[sync_id] = url
-        links[(event.name, event.start_time)] = url
-    return links
 
 
 class ReminderRunner:
@@ -109,7 +113,6 @@ class ReminderRunner:
                 self.save()
             except Exception as exc:
                 print(f'Reminder bookkeeping pending: {exc}')
-        links = None
         for event in events:
             try:
                 if not all(event.get(k) for k in ('id', 'name', 'start_time')):
@@ -119,16 +122,9 @@ class ReminderRunner:
                 key = f"{event['id']}:{code}"
                 if code is None or pair in sent or key in self.delivered:
                     continue
-                if links is None:
-                    try:
-                        links = await scheduled_links(channel.guild)
-                    except Exception as exc:
-                        print(f'Cannot load RSVP links: {exc}')
-                        links = {}
-                url = links.get(event['id']) or links.get((event['name'], event_start(event)))
-                kwargs = {'content': build_reminder(event, now, code, url),
+                kwargs = {'content': build_reminder(event, now, code),
                           'allowed_mentions': discord.AllowedMentions(everyone=True, users=False, roles=False)}
-                if code == '2d' and event.get('flyer_url'):
+                if event.get('flyer_url'):
                     from bot.events import _fetch_flyer
                     flyer = await _fetch_flyer(event['flyer_url'])
                     if flyer:
