@@ -21,7 +21,6 @@ VERIFICATION_URL_BASE = "https://www.ufembs.com/discord-verify"
 TOKEN_EXPIRY_MINUTES = 15
 
 REMINDER_INTERVALS = [
-    {"days": 5, "message": "5 days"},
-    {"days": 1, "message": "1 day"},
+    {"days": 2, "message": "2 days"},
     {"hours": 2, "message": "2 hours"}
 ]

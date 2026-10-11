@@ -3,3 +3,5 @@ venv/
 __pycache__/
 words/__pycache__/
 discord.log
+data/reminder_deliveries.json
+data/reminder_deliveries.tmp

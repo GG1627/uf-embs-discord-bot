@@ -6,7 +6,8 @@ import discord
 from discord.ext import commands
 from bot.helpers import check_spam, check_profanity, get_roles
 from bot.views import MajorView, VerifyView, YearView
-from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, ANNOUNCEMENTS_CHANNEL_ID, REMINDER_INTERVALS
+from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE
+from bot.reminders import check_event_reminders
 
 
 def setup_events(bot: commands.Bot, supabase_client=None):
@@ -49,12 +50,10 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         
         # Start background tasks if Supabase is available (guard against duplicate on_ready)
         if supabase_client and not getattr(bot, '_reminder_task_started', False):
-            # Event reminder announcements are intentionally disabled. Keep this
-            # line commented out so the feature can be restored later if needed.
-            # asyncio.create_task(check_event_reminders(bot, supabase_client))
+            asyncio.create_task(check_event_reminders(bot, supabase_client))
             asyncio.create_task(sync_discord_scheduled_events(bot, supabase_client))
             bot._reminder_task_started = True
-            print("Event reminder announcements disabled")
+            print("Event reminders started (2 days and 2 hours)")
             print("Discord scheduled event sync started")
         elif not supabase_client:
             print("Event reminder system disabled - Supabase not available")
@@ -172,178 +171,6 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         
         # Process bot commands after checking profanity
         await bot.process_commands(message)
-
-    async def check_event_reminders(bot, supabase):
-        """Check for events that need reminders and send them.
-        
-        Uses a 'past-due' timing model: if a reminder's target time has arrived
-        (or passed) and the event itself hasn't happened yet, the reminder is sent.
-        This naturally catches up on missed reminders after bot downtime.
-        """
-        from datetime import datetime, timedelta, timezone
-        try:
-            from zoneinfo import ZoneInfo
-            eastern_tz = ZoneInfo('America/New_York')
-        except ImportError:
-            eastern_tz = timezone(timedelta(hours=-5))
-
-        if not supabase:
-            print("Warning: Supabase not available for event reminders")
-            return
-            
-        while True:
-            try:
-                current_time = datetime.now(timezone.utc)
-                
-                # Get upcoming events (next 30 days)
-                thirty_days_from_now = current_time + timedelta(days=30)
-                
-                response = supabase.table('events').select('*').gte('start_time', current_time.isoformat()).lte('start_time', thirty_days_from_now.isoformat()).execute()
-                events = response.data if response.data else []
-                
-                announcements_channel = bot.get_channel(ANNOUNCEMENTS_CHANNEL_ID)
-                
-                if not announcements_channel:
-                    print(f"Warning: Announcements channel {ANNOUNCEMENTS_CHANNEL_ID} not found")
-                    await asyncio.sleep(300)
-                    continue
-                
-                # Batch-fetch all sent reminders in one query instead of per-event
-                sent_reminders_set = set()
-                if events:
-                    event_ids = [e['id'] for e in events if e.get('id')]
-                    if event_ids:
-                        try:
-                            rem_response = supabase.table('event_reminders').select('event_id, reminder_type').in_('event_id', event_ids).execute()
-                            for r in (rem_response.data or []):
-                                sent_reminders_set.add((r['event_id'], r['reminder_type']))
-                        except Exception as e:
-                            print(f"Warning: Failed to batch-fetch sent reminders, will skip this cycle: {e}")
-                            await asyncio.sleep(300)
-                            continue
-                
-                for event in events:
-                    try:
-                        # Guard required fields
-                        if not event.get('start_time') or not event.get('name'):
-                            print(f"Skipping event with missing start_time or name: {event.get('id', 'unknown')}")
-                            continue
-                        
-                        # Parse event start time
-                        start_time_str = event['start_time'].replace('Z', '+00:00')
-                        event_datetime = datetime.fromisoformat(start_time_str)
-                        if event_datetime.tzinfo is None:
-                            event_datetime = event_datetime.replace(tzinfo=timezone.utc)
-                        
-                        time_until = event_datetime - current_time
-                        
-                        # Skip events that have already passed
-                        if time_until.total_seconds() <= 0:
-                            continue
-                        
-                        # Check each reminder interval
-                        for interval in REMINDER_INTERVALS:
-                            # Build reminder type code (e.g., "5d", "1d", "2h")
-                            if 'days' in interval:
-                                reminder_type_code = f"{interval['days']}d"
-                            elif 'hours' in interval:
-                                reminder_type_code = f"{interval['hours']}h"
-                            else:
-                                continue
-                            
-                            # Check if reminder already sent (O(1) set lookup)
-                            if (event['id'], reminder_type_code) in sent_reminders_set:
-                                continue
-                            
-                            # Calculate the target time for this reminder
-                            reminder_time = event_datetime
-                            if 'days' in interval:
-                                reminder_time = reminder_time - timedelta(days=interval['days'])
-                            if 'hours' in interval:
-                                reminder_time = reminder_time - timedelta(hours=interval['hours'])
-                            
-                            # Past-due check: send if reminder time has arrived and event is still upcoming
-                            if reminder_time <= current_time:
-                                
-                                # Create rich embed with event details
-                                event_name = event['name']
-                                embed = discord.Embed(
-                                    title="📢 Event Reminder",
-                                    description=f"**{event_name}** is happening in **{interval['message']}**!\n\u200b",
-                                    color=discord.Color.teal()
-                                )
-                                
-                                # Add flyer image if available
-                                if event.get('flyer_url'):
-                                    embed.set_image(url=event['flyer_url'])
-                                
-                                # Format date/time - convert UTC to Eastern Time
-                                eastern_time = event_datetime.astimezone(eastern_tz)
-                                date_str = eastern_time.strftime('%B %d, %Y at %I:%M %p %Z')
-                                embed.add_field(
-                                    name="📅 Date & Time",
-                                    value=date_str,
-                                    inline=True
-                                )
-                                
-                                days = time_until.days
-                                hours = time_until.seconds // 3600
-                                embed.add_field(
-                                    name="⏰ Time Until",
-                                    value=f"{days} days, {hours} hours",
-                                    inline=True
-                                )
-                                
-                                if event.get('location'):
-                                    embed.add_field(
-                                        name="📍 Location",
-                                        value=event['location'],
-                                        inline=True
-                                    )
-                                
-                                # Spacer between info block and description
-                                embed.add_field(name="\u200b", value="\u200b", inline=False)
-                                
-                                if event.get('description'):
-                                    # Discord embed field value limit is 1024 characters
-                                    desc = event['description'][:1024]
-                                    embed.add_field(
-                                        name="📝 Description",
-                                        value=desc,
-                                        inline=False
-                                    )
-                                
-                                embed.set_footer(text=f"Event ID: {event['id']}")
-                                
-                                # Send with @everyone as content so it actually pings
-                                await announcements_channel.send(content="@everyone", embed=embed)
-                                
-                                # Record that we sent this reminder
-                                try:
-                                    supabase.table('event_reminders').insert({
-                                        'event_id': event['id'],
-                                        'reminder_type': reminder_type_code
-                                    }).execute()
-                                    sent_reminders_set.add((event['id'], reminder_type_code))
-                                except Exception as e:
-                                    print(f"Error recording reminder: {e}")
-                                
-                                print(f"Sent {interval['message']} reminder for event: {event_name}")
-                    
-                    except Exception as e:
-                        print(f"Error processing reminder for event {event.get('id', 'unknown')}: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        continue
-                
-                # Check every 5 minutes
-                await asyncio.sleep(300)
-                
-            except Exception as e:
-                print(f"Error in event reminder checker: {e}")
-                import traceback
-                traceback.print_exc()
-                await asyncio.sleep(300)
 
     async def sync_discord_scheduled_events(bot, supabase):
         """Periodically sync Supabase events to Discord Scheduled Events."""

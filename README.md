@@ -51,6 +51,35 @@ A Discord bot built with Python for the UF EMBS community.
      .env
      ```
 
+## Event reminders
+
+The bot checks every five minutes and posts regular messages in the configured
+announcements channel at two days and two hours before an event. The early
+reminder includes the event description as written (trimmed to 700 characters)
+and attaches its flyer when available. The final reminder omits both. Discord
+timestamps show the date and time in each member's timezone. RSVP links point
+to the matching Discord scheduled event when it is available.
+
+After downtime, only the latest applicable reminder is sent, using the actual
+time remaining. Existing reminder records prevent repeat deliveries.
+
+Admins can preview either format in the current channel without pings or
+changing reminder records:
+
+```text
+!previewreminder EVENT_UUID 2d
+!previewreminder EVENT_UUID 2h
+```
+
+Run local tests with `python -m unittest discover -s tests -v`.
+
+Run only one bot instance that sends announcements. Keep
+`data/reminder_deliveries.json` on persistent storage: it retains delivered
+reminders whose Supabase recording failed, and the bot retries that recording
+without sending another message. This reduces duplicate risk, but a process
+crash between Discord delivery and saving the journal, or losing the journal
+before database recovery, can still cause a duplicate.
+
 ## 📚 Resources
 
 - [Discord Developer Portal](https://discord.com/developers/applications/)

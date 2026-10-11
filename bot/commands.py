@@ -11,6 +11,39 @@ from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHA
 
 def setup_commands(bot: commands.Bot):
     """Register all bot commands."""
+
+    @bot.command()
+    @commands.has_permissions(manage_guild=True)
+    async def previewreminder(ctx, event_uuid: str, interval: str = '2d'):
+        """Preview a reminder here without pings or recording a delivery."""
+        from datetime import timedelta
+        import asyncio
+        import io
+        from bot.reminders import build_reminder, event_start, scheduled_links
+        from bot.events import _fetch_flyer
+
+        if interval not in ('2d', '2h'):
+            return await ctx.send('Use !previewreminder EVENT_UUID 2d (or 2h).')
+        supabase = getattr(bot, 'supabase', None)
+        if not supabase:
+            return await ctx.send('Supabase not configured.')
+        try:
+            response = await asyncio.to_thread(lambda: supabase.table('events').select('*').eq('id', event_uuid).execute())
+            if not response.data:
+                return await ctx.send('Event not found.')
+            event = response.data[0]
+            links = await scheduled_links(ctx.guild) if ctx.guild else {}
+            url = links.get(event['id']) or links.get((event['name'], event_start(event)))
+            preview_time = event_start(event) - (timedelta(days=2) if interval == '2d' else timedelta(hours=2))
+            kwargs = {'content': build_reminder(event, preview_time, interval, url, ping=False),
+                      'allowed_mentions': discord.AllowedMentions.none()}
+            if interval == '2d' and event.get('flyer_url'):
+                flyer = await _fetch_flyer(event['flyer_url'])
+                if flyer:
+                    kwargs['file'] = discord.File(io.BytesIO(flyer), filename='event-flyer.png')
+            await ctx.send(**kwargs)
+        except Exception as exc:
+            await ctx.send(f'Could not preview reminder: {exc}', allowed_mentions=discord.AllowedMentions.none())
     
     # not needed anymore because of discord onboarding
     
