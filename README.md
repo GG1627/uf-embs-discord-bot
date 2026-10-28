@@ -53,7 +53,26 @@ A Discord bot built with Python for the UF EMBS community.
 
 ## Event reminders
 
-The bot checks every five minutes and posts regular messages in the configured
+Use `BOT_ENV=dev` or `BOT_ENV=prod`. Automatic reminders are **disabled by
+default**. They require both `BOT_ENV=prod` and `EVENT_REMINDERS_ENABLED=true`.
+Missing, false, or unrecognized values leave them disabled. The startup logs
+show the environment and reminder status.
+
+For local runs, set `BOT_ENV=dev` in `.env` and restart the bot.
+For Fly.io, `fly.toml` keeps `BOT_ENV = 'prod'` for Notion access and sets
+`EVENT_REMINDERS_ENABLED = 'false'`, so this deployment pauses public event
+reminders. Change that flag to `'true'` and redeploy only when ready to resume.
+Fly.io uses its deployed environment; changing your local `.env` does not
+change the running Fly app. An existing Fly secret named `BOT_ENV` overrides
+the value in `fly.toml`, so avoid defining a setting in both places.
+
+This switch only controls automatic reminder messages. Commands (including
+`!previewreminder`), verification, moderation, and scheduled-event sync continue
+to work with their existing server/channel settings. It does not restrict the
+bot to a dev server. Reminders paused during development are not marked as
+sent; enabling production can immediately send a reminder that is still due.
+
+In production, the bot checks every five minutes and posts regular messages in the configured
 announcements channel at two days and two hours before an event. The early
 reminder includes the event description as written (trimmed to 700 characters)
 and both reminders attach the flyer when available. The final reminder omits
@@ -83,6 +102,12 @@ without sending another message. This reduces duplicate risk, but a process
 crash between Discord delivery and saving the journal, or losing the journal
 before database recovery, can still cause a duplicate.
 
+## Officer Notion integration
+
+Optional Notion status notifications, officer-only event lists, and Groq query
+interpretation are available. They stay disabled until configured. See
+[NOTION.md](NOTION.md) for setup, access controls, Supabase tracking storage,
+and testing instructions. Local settings are documented in `.env.example`.
 ## 📚 Resources
 
 - [Discord Developer Portal](https://discord.com/developers/applications/)

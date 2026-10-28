@@ -1,5 +1,16 @@
 """Configuration constants for the Discord bot."""
 
+import os
+from dotenv import load_dotenv
+
+# Load local settings before any module imports configuration constants.
+# Existing process variables (including Fly.io settings) take precedence.
+load_dotenv()
+
+BOT_ENV = os.getenv("BOT_ENV", "dev").strip().lower()
+# Public announcements require an explicit opt-in, independently of Notion.
+REMINDERS_ENABLED = BOT_ENV == "prod" and os.getenv("EVENT_REMINDERS_ENABLED", "false").strip().lower() == "true"
+
 # File paths
 DATA_DIR = "data"
 MAJOR_YEAR_SELECT_SAVE_FILE = "data/major_year_select_message.json"

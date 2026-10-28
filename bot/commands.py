@@ -6,11 +6,14 @@ import discord
 from discord.ext import commands
 import requests
 from bot.views import MajorView, VerifyView, YearView
+from bot.help import EMBSHelpCommand
 from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE, VERIFY_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID, RULES_SAVE_FILE, RULES_CHANNEL_ID, REMINDER_INTERVALS
 
 
 def setup_commands(bot: commands.Bot):
     """Register all bot commands."""
+
+    bot.help_command = EMBSHelpCommand()
 
     @bot.command()
     @commands.has_permissions(manage_guild=True)

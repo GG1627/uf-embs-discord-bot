@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from bot.helpers import check_spam, check_profanity, get_roles
 from bot.views import MajorView, VerifyView, YearView
-from bot.config import MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE
+from bot.config import BOT_ENV, REMINDERS_ENABLED, MAJOR_YEAR_SELECT_SAVE_FILE, VERIFY_SAVE_FILE
 from bot.reminders import check_event_reminders
 
 
@@ -48,15 +48,21 @@ def setup_events(bot: commands.Bot, supabase_client=None):
         bot.add_view(VerifyView(supabase_client))
         print("Persistent views added")
         
-        # Start background tasks if Supabase is available (guard against duplicate on_ready)
-        if supabase_client and not getattr(bot, '_reminder_task_started', False):
+        # Start reminders only in production (guard against duplicate on_ready).
+        print(f"Bot environment: {BOT_ENV}; automatic reminders {'enabled' if REMINDERS_ENABLED else 'disabled'}")
+        if not REMINDERS_ENABLED:
+            print("Automatic reminders disabled - requires BOT_ENV=prod and EVENT_REMINDERS_ENABLED=true")
+        elif supabase_client and not getattr(bot, '_reminder_task_started', False):
             asyncio.create_task(check_event_reminders(bot, supabase_client))
-            asyncio.create_task(sync_discord_scheduled_events(bot, supabase_client))
             bot._reminder_task_started = True
             print("Event reminders started (2 days and 2 hours)")
-            print("Discord scheduled event sync started")
         elif not supabase_client:
             print("Event reminder system disabled - Supabase not available")
+
+        if supabase_client and not getattr(bot, '_event_sync_task_started', False):
+            asyncio.create_task(sync_discord_scheduled_events(bot, supabase_client))
+            bot._event_sync_task_started = True
+            print("Discord scheduled event sync started")
 
     @bot.event
     async def on_member_join(member: discord.Member):

@@ -4,16 +4,15 @@ import discord
 from discord.ext import commands
 import logging
 import asyncio
-from dotenv import load_dotenv
 import os
 from supabase import create_client, Client
 from bot.events import setup_events
 from bot.commands import setup_commands
 from bot.config import DATA_DIR
+from bot.notion import install_notion
 import traceback
 
-# Load environment variables
-load_dotenv()
+# Local environment variables are loaded by bot.config during imports above.
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
@@ -29,8 +28,20 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
+class EMBSBot(commands.Bot):
+    async def setup_hook(self):
+        await install_notion(self)
+
+    async def close(self):
+        try:
+            if self.get_cog('NotionCog') is not None:
+                await self.remove_cog('NotionCog')
+        finally:
+            await super().close()
+
+
 # Create bot instance
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = EMBSBot(command_prefix='!', intents=intents)
 
 # Store supabase credentials on bot for later initialization
 bot.supabase_url = SUPABASE_URL

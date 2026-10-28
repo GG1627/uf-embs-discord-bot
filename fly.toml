@@ -3,8 +3,40 @@ primary_region = 'dfw'
 
 [build]
 
+[env]
+  # Keep prod for Notion access; public reminders have their own switch.
+  BOT_ENV = 'prod'
+  EVENT_REMINDERS_ENABLED = 'false'
+  # Dev settings are retained for future testing; prod uses the private channel below.
+  NOTION_ENABLED = 'true'
+  NOTION_ASSET_BASE_URL = 'https://embs-discord-bot.fly.dev'
+  NOTION_DEV_GUILD_ID = '1448787554395623457'
+  NOTION_DEV_CHANNEL_ID = '1455006792403914903'
+  NOTION_DEV_OFFICER_ROLE_IDS = ''
+  NOTION_PROD_GUILD_ID = '1376293904227237978'
+  NOTION_PROD_CHANNEL_ID = '1565050975813763142'
+  NOTION_PROD_OFFICER_ROLE_IDS = '1376301509674795120,1376293904227237979'
+  NOTION_DATABASE_ID = '3f3cf102dd8780ba8e54db1d547a6617'
+  NOTION_DATA_SOURCE_ID = '3f3cf102-dd87-803f-a9e0-000b51a7e96a'
+  NOTION_TITLE_PROPERTY = 'Event Name'
+  NOTION_STATUS_PROPERTY = 'Status'
+  NOTION_DATE_PROPERTY = 'Event Date'
+  NOTION_LOCATION_PROPERTY = 'Room Booking/Location'
+  # Sunday 10 AM America/New_York; follows daylight saving time.
+  NOTION_DIGEST_ENABLED = 'true'
+  # Requires explicitly confirmed !notionlink mappings; leave off until ready.
+  NOTION_COMPLETION_SYNC_ENABLED = 'false'
+  GROQ_MODEL = 'openai/gpt-oss-120b'
+
 [processes]
   app = 'python main.py'
+
+[http_service]
+  processes = ['app']
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  min_machines_running = 1
 
 [[vm]]
   size = 'shared-cpu-1x'
