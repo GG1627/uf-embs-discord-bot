@@ -80,10 +80,10 @@ class FormattingTests(unittest.TestCase):
         e = event()
         full = build_reminder(e, NOW, '2d')
         self.assertIn(e['description'], full)
-        self.assertNotIn('Join us for', full)
+        self.assertIn('# **Join us for EMBS Meeting! ✨**', full)
         self.assertNotIn('View event & RSVP', full)
         short = build_reminder(event(1), NOW, '2h')
-        self.assertIn('about 1 hour', short)
+        self.assertIn('# **EMBS Meeting starts in about 1 hour! 🚨**', short)
         self.assertNotIn(e['description'], short)
         self.assertNotIn(e['id'], short)
 

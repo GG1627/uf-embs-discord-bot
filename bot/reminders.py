@@ -42,7 +42,8 @@ def build_reminder(event, now, code, ping=True):
     else:
         timing = f"in {minutes} minute{'s' if minutes != 1 else ''}"
     name = discord.utils.escape_markdown(discord.utils.escape_mentions(event['name']))[:200]
-    lines = (['@everyone'] if ping else []) + [f"**{name} starts {timing}!**"]
+    title = f"Join us for {name}! ✨" if code == '2d' else f"{name} starts {timing}! 🚨"
+    lines = (['@everyone'] if ping else []) + [f"# **{title}**"]
     if code == '2d' and event.get('description'):
         description = discord.utils.escape_mentions(event['description'].strip())
         if len(description) > 700:
